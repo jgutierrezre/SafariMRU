@@ -103,4 +103,34 @@ final class SafariAX {
             AXUIElementPerformAction(tabs[fallbackIndex], kAXPressAction as CFString)
         }
     }
+
+    /// Returns a title -> favicon image data map by walking the tab bar once.
+    static func faviconDataByTitle() -> [String: Data] {
+        var result: [String: Data] = [:]
+        for t in findTabs() {
+            let title = strAttr(t, kAXTitleAttribute)
+            guard !title.isEmpty, result[title] == nil else { continue }
+            if let data = faviconData(for: t) {
+                result[title] = data
+            }
+        }
+        return result
+    }
+
+    private static func faviconData(for tab: AXUIElement) -> Data? {
+        guard let children = attr(tab, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
+        for c in children where strAttr(c, kAXRoleAttribute) == "AXImage" {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(c, "AXImageData" as CFString, &value) == .success,
+                  let value = value else { continue }
+            if let nsData = value as? NSData {
+                return nsData as Data
+            }
+            if CFGetTypeID(value) == CGImage.typeID {
+                let image = value as! CGImage
+                return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+            }
+        }
+        return nil
+    }
 }

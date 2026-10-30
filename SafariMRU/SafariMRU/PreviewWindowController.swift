@@ -130,48 +130,19 @@ final class PreviewView: NSView {
     }
 
     private func loadFavicons() {
-        for (i, tab) in tabs.enumerated() where !tab.favIconUrl.isEmpty {
-            let index = i
-            let url = tab.favIconUrl
-            FaviconLoader.shared.load(url) { [weak self] image in
-                guard let self = self, let image = image else { return }
-                DispatchQueue.main.async {
-                    self.favicons[index] = image
-                    self.needsDisplay = true
+        let titles = tabs.map { $0.title }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let favicons = SafariAX.faviconDataByTitle()
+            var images: [Int: NSImage] = [:]
+            for (i, title) in titles.enumerated() {
+                if let data = favicons[title], let img = NSImage(data: data) {
+                    images[i] = img
                 }
             }
-        }
-    }
-}
-
-final class FaviconLoader {
-    static let shared = FaviconLoader()
-    private var cache: [String: NSImage] = [:]
-    private var inFlight: Set<String> = []
-    private let lock = NSLock()
-
-    func load(_ urlString: String, completion: @escaping (NSImage?) -> Void) {
-        lock.lock()
-        if let img = cache[urlString] { lock.unlock(); completion(img); return }
-        if inFlight.contains(urlString) { lock.unlock(); return }
-        inFlight.insert(urlString)
-        lock.unlock()
-
-        guard let url = URL(string: urlString) else {
-            lock.lock(); inFlight.remove(urlString); lock.unlock()
-            completion(nil)
-            return
-        }
-
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-            let img = data.flatMap { NSImage(data: $0) }
-            if let self = self {
-                self.lock.lock()
-                self.inFlight.remove(urlString)
-                if let img = img { self.cache[urlString] = img }
-                self.lock.unlock()
+            DispatchQueue.main.async {
+                self?.favicons = images
+                self?.needsDisplay = true
             }
-            completion(img)
-        }.resume()
+        }
     }
 }

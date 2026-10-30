@@ -44,6 +44,6 @@ final class PreviewState {
         lock.lock()
         _tabs = parsed
         lock.unlock()
-        DebugLog.shared.log("PreviewState: \(parsed.count) tabs -> \(parsed.map { $0.title })")
+        DebugLog.shared.log("PreviewState: \(parsed.count) tabs -> \(parsed.map { "\($0.title)[fav=\($0.favIconUrl.isEmpty ? "no" : $0.favIconUrl)]" })")
     }
 }
