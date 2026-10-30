@@ -67,9 +67,11 @@ browser.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
 });
 
 browser.tabs.onCreated.addListener(async (tab) => {
-    if (tab.id !== undefined) {
-        await refreshTabInfo(tab.id);
-    }
+    if (tab.id === undefined || tab.windowId === undefined) return;
+    await refreshTabInfo(tab.id);
+    const mru = getMRU(tab.windowId);
+    if (!mru.includes(tab.id)) mru.push(tab.id);
+    await pushState();
 });
 
 browser.tabs.onRemoved.addListener((tabId) => {
@@ -107,10 +109,9 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
             }
 
             const mru = getMRU(win.id);
-            if (active && active.id !== undefined) mru.push(active.id);
-            for (const t of rest) {
-                if (t.id !== undefined) mru.push(t.id);
-            }
+            const addUnique = (id) => { if (id !== undefined && !mru.includes(id)) mru.push(id); };
+            if (active) addUnique(active.id);
+            for (const t of rest) addUnique(t.id);
         }
         await pushState();
     } catch {

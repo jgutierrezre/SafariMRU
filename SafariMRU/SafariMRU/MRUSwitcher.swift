@@ -39,7 +39,7 @@ final class MRUSwitcher {
 
         if direction > 0 {
             selection += 1
-            if selection >= cycleTabs.count { selection = 1 }
+            if selection >= cycleTabs.count { selection = 0 }
         } else {
             selection -= 1
             if selection < 0 { selection = cycleTabs.count - 1 }
