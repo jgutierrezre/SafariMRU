@@ -16,12 +16,18 @@ final class LocalServer {
 
     func start() {
         do {
-            let listener = try NWListener(using: .tcp, on: NWEndpoint.Port(rawValue: port)!)
+            let parameters = NWParameters.tcp
+            parameters.requiredLocalEndpoint = NWEndpoint.hostPort(
+                host: NWEndpoint.Host("127.0.0.1"),
+                port: NWEndpoint.Port(rawValue: port)!
+            )
+            let listener = try NWListener(using: parameters)
             listener.newConnectionHandler = { conn in
                 ConnectionHandler().handle(conn)
             }
             listener.start(queue: .global(qos: .utility))
             self.listener = listener
+            NSLog("LocalServer: listening on 127.0.0.1:\(port)")
         } catch {
             NSLog("LocalServer failed to start: \(error)")
         }
@@ -49,8 +55,11 @@ final class LocalServer {
 
 private final class ConnectionHandler {
     private var data = Data()
+    /// Keeps this handler alive for the lifetime of the connection.
+    private var keepAlive: ConnectionHandler?
 
     func handle(_ conn: NWConnection) {
+        keepAlive = self
         conn.start(queue: .global(qos: .utility))
         receive(conn)
     }
@@ -62,10 +71,12 @@ private final class ConnectionHandler {
             if let chunk = chunk, !chunk.isEmpty {
                 self.data.append(chunk)
                 if let body = LocalServer.extractJSONBody(from: self.data) {
+                    NSLog("LocalServer: received state (\(body.count) bytes)")
                     PreviewState.shared.applyJSON(body)
                     let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                     conn.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in
                         conn.cancel()
+                        self.keepAlive = nil
                     })
                     return
                 }
@@ -73,6 +84,7 @@ private final class ConnectionHandler {
 
             if isComplete || error != nil {
                 conn.cancel()
+                self.keepAlive = nil
             } else {
                 self.receive(conn)
             }

@@ -46,5 +46,6 @@ final class PreviewState {
         lock.lock()
         _tabs = parsed
         lock.unlock()
+        NSLog("PreviewState: received \(parsed.count) tabs")
     }
 }
