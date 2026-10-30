@@ -3,7 +3,7 @@
 //  SafariMRU
 //
 //  Shared tab state, populated by the Safari extension over localhost. Holds
-//  the MRU-ordered list of tabs with metadata and thumbnails for the preview.
+//  the MRU-ordered list of tabs with metadata for the preview.
 //
 
 import Cocoa
@@ -13,7 +13,6 @@ struct TabPreview {
     let url: String
     let favIconUrl: String
     let index: Int
-    let thumbnail: String // data URL, or empty
 }
 
 final class PreviewState {
@@ -39,13 +38,12 @@ final class PreviewState {
                 title: t["title"] as? String ?? "",
                 url: t["url"] as? String ?? "",
                 favIconUrl: t["favIconUrl"] as? String ?? "",
-                index: t["index"] as? Int ?? 0,
-                thumbnail: t["thumbnail"] as? String ?? ""
+                index: t["index"] as? Int ?? 0
             ))
         }
         lock.lock()
         _tabs = parsed
         lock.unlock()
-        NSLog("PreviewState: received \(parsed.count) tabs")
+        DebugLog.shared.log("PreviewState: \(parsed.count) tabs -> \(parsed.map { $0.title })")
     }
 }

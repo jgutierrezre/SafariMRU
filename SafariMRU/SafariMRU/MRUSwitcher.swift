@@ -28,7 +28,7 @@ final class MRUSwitcher {
         if !isCycling {
             // A cycle must begin with a forward press (Ctrl+Tab).
             if direction < 0 { return }
-            let tabs = PreviewState.shared.tabs
+            let tabs = Self.currentTabs()
             guard !tabs.isEmpty else { return }
             cycleTabs = tabs
             isCycling = true
@@ -41,10 +41,28 @@ final class MRUSwitcher {
             selection += 1
             if selection >= cycleTabs.count { selection = 1 }
         } else {
-            if selection > 0 { selection -= 1 }
+            selection -= 1
+            if selection < 0 { selection = cycleTabs.count - 1 }
         }
 
         updatePreview()
+    }
+
+    /// Prefer the extension's state; fall back to AX tab titles when it's empty.
+    private static func currentTabs() -> [TabPreview] {
+        let ext = PreviewState.shared.tabs
+        if !ext.isEmpty { return ext }
+
+        guard let (active, titles) = SafariAX.getTabInfo() else { return [] }
+        var result: [TabPreview] = []
+        for (i, title) in titles.enumerated() {
+            result.append(TabPreview(title: title, url: "", favIconUrl: "", index: i))
+        }
+        if active >= 0 && active < result.count {
+            let a = result.remove(at: active)
+            result.insert(a, at: 0)
+        }
+        return result
     }
 
     private func doCommit() {
@@ -56,9 +74,11 @@ final class MRUSwitcher {
         selection = 0
 
         DispatchQueue.main.async {
+            let t0 = Date()
             if target >= 0 && target < tabs.count {
-                SafariAX.switchToTab(index: tabs[target].index)
+                SafariAX.switchToTab(title: tabs[target].title, fallbackIndex: tabs[target].index)
             }
+            DebugLog.shared.log("commit: switch took \(Int(Date().timeIntervalSince(t0) * 1000))ms (target \(target) of \(tabs.count))")
             PreviewWindowController.shared.hide()
         }
     }

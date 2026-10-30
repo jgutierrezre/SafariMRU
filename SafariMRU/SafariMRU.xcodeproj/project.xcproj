@@ -16,6 +16,7 @@
       "path": "SafariMRU",
       "children": [
         { "path": "AppDelegate.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
+        { "path": "DebugLog.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "LocalServer.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "MRUSwitcher.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "PreviewState.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
@@ -37,8 +38,6 @@
           "name": "Resources",
           "children": [
             { "path": "Resources/background.js", "target-membership": [ "SafariMRU Extension/resources" ] },
-            { "path": "Resources/content.js", "target-membership": [ "SafariMRU Extension/resources" ] },
-            { "path": "Resources/html2canvas.min.js", "target-membership": [ "SafariMRU Extension/resources" ] },
             { "path": "Resources/manifest.json", "target-membership": [ "SafariMRU Extension/resources" ] },
           ],
         },

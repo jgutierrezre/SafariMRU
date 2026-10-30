@@ -1,4 +1,4 @@
-// background.js — tracks tab MRU order and metadata, captures thumbnails, and
+// background.js — tracks tab MRU order and metadata (title, URL, favicon), and
 // pushes the state to the native host app over a localhost HTTP endpoint.
 
 const PORT = 49153;
@@ -6,7 +6,6 @@ const STATE_URL = `http://127.0.0.1:${PORT}/state`;
 
 const windowMRU = new Map();   // windowId -> [tabId, ...] most-recent first
 const tabInfo = new Map();     // tabId -> { title, url, favIconUrl, index }
-const thumbnails = new Map();  // tabId -> data URL
 
 function getMRU(windowId) {
     if (!windowMRU.has(windowId)) windowMRU.set(windowId, []);
@@ -34,17 +33,6 @@ async function refreshTabInfo(tabId) {
     }
 }
 
-async function captureThumbnail(tabId) {
-    try {
-        const res = await browser.tabs.sendMessage(tabId, { type: "capture" });
-        if (res && res.dataUrl) {
-            thumbnails.set(tabId, res.dataUrl);
-        }
-    } catch {
-        // content script not loaded (privileged page, discarded tab, etc.)
-    }
-}
-
 async function pushState() {
     let win;
     try {
@@ -58,7 +46,7 @@ async function pushState() {
     for (const id of getMRU(win.id)) {
         const info = tabInfo.get(id);
         if (!info) continue;
-        ordered.push({ ...info, thumbnail: thumbnails.get(id) || "" });
+        ordered.push({ ...info });
     }
 
     try {
@@ -75,7 +63,6 @@ async function pushState() {
 browser.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
     promote(windowId, tabId);
     await refreshTabInfo(tabId);
-    await captureThumbnail(tabId);
     await pushState();
 });
 
@@ -87,19 +74,14 @@ browser.tabs.onCreated.addListener(async (tab) => {
 
 browser.tabs.onRemoved.addListener((tabId) => {
     tabInfo.delete(tabId);
-    thumbnails.delete(tabId);
     for (const mru of windowMRU.values()) {
         const i = mru.indexOf(tabId);
         if (i !== -1) mru.splice(i, 1);
     }
 });
 
-browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if (changeInfo.status === "complete" && tab.active) {
-        await refreshTabInfo(tabId);
-        await captureThumbnail(tabId);
-        await pushState();
-    } else if (changeInfo.title || changeInfo.favIconUrl) {
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+    if (changeInfo.title || changeInfo.favIconUrl) {
         await refreshTabInfo(tabId);
         await pushState();
     }
@@ -128,10 +110,6 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             if (active && active.id !== undefined) mru.push(active.id);
             for (const t of rest) {
                 if (t.id !== undefined) mru.push(t.id);
-            }
-
-            if (active && active.id !== undefined) {
-                await captureThumbnail(active.id);
             }
         }
         await pushState();

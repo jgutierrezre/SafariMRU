@@ -86,10 +86,21 @@ final class SafariAX {
         return (active, titles)
     }
 
-    /// Switch Safari's focused window to the given 0-based tab index.
-    static func switchToTab(index: Int) {
+    /// Switch Safari's focused window to the tab matching the given title,
+    /// falling back to the 0-based index if no title matches.
+    static func switchToTab(title: String, fallbackIndex: Int) {
         let tabs = findTabs()
-        guard index >= 0 && index < tabs.count else { return }
-        AXUIElementPerformAction(tabs[index], kAXPressAction as CFString)
+        guard !tabs.isEmpty else { return }
+
+        if !title.isEmpty {
+            for t in tabs where strAttr(t, kAXTitleAttribute) == title {
+                AXUIElementPerformAction(t, kAXPressAction as CFString)
+                return
+            }
+        }
+
+        if fallbackIndex >= 0 && fallbackIndex < tabs.count {
+            AXUIElementPerformAction(tabs[fallbackIndex], kAXPressAction as CFString)
+        }
     }
 }
