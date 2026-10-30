@@ -168,25 +168,26 @@ final class MRUSwitcher {
         let a = titles[active]
         activeTitle = a
 
-        if mru.isEmpty {
-            initialSync()
-            if mru.isEmpty { return }
-        }
-        if mru.first != a { promote(a) }
-
-        guard mru.count > 1 else { return }
-
         if !isCycling {
+            // A cycle must begin with a forward press (Ctrl+Tab). Backward first does nothing.
+            if direction < 0 { return }
+            if mru.isEmpty {
+                initialSync()
+                if mru.isEmpty { return }
+            }
+            // Sync the active tab to the front (catches a click the poll hasn't seen yet).
+            if mru.first != a { promote(a) }
             isCycling = true
             cyclePos = 0
         }
+
+        guard mru.count > 1 else { return }
 
         if direction > 0 {
             cyclePos += 1
             if cyclePos >= mru.count { cyclePos = 1 }
         } else {
-            cyclePos -= 1
-            if cyclePos < 0 { cyclePos = mru.count - 1 }
+            if cyclePos > 0 { cyclePos -= 1 }
         }
 
         let target = mru[cyclePos]
