@@ -11,6 +11,7 @@ import Cocoa
 import ApplicationServices
 
 private let kVK_Tab: CGKeyCode = 48
+private let kVK_Escape: CGKeyCode = 53
 
 final class ShortcutInterceptor {
     static let shared = ShortcutInterceptor()
@@ -77,6 +78,12 @@ final class ShortcutInterceptor {
             let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
             let isCtrl = flags.contains(.maskControl)
             let isCmdOrOpt = flags.contains(.maskCommand) || flags.contains(.maskAlternate)
+
+            if keyCode == kVK_Escape && isCycling {
+                isCycling = false
+                MRUSwitcher.shared.cancel()
+                return nil
+            }
 
             if keyCode == kVK_Tab && isCtrl && !isCmdOrOpt {
                 isCycling = true

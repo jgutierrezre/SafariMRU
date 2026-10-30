@@ -31,7 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         item.menu = menu
 
         ShortcutInterceptor.shared.start()
-        MRUSwitcher.shared.start()
+        LocalServer.shared.start()
     }
 
     @objc private func openSettings() {
