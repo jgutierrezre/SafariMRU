@@ -16,6 +16,10 @@
       "path": "SafariMRU",
       "children": [
         { "path": "AppDelegate.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
+        { "path": "MRUSwitcher.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
+        { "path": "SafariAX.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
+        { "path": "SettingsWindowController.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
+        { "path": "ShortcutInterceptor.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "main.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "Assets.xcassets", "target-membership": [ "SafariMRU/resources" ] },
         { "path": "Info.plist" },
