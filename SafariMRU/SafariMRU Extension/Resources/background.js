@@ -35,16 +35,21 @@ async function refreshTabInfo(tabId) {
 async function pushState() {
     let win;
     try {
-        win = await browser.windows.getLastFocused({ windowTypes: ["normal"] });
+        win = await browser.windows.getLastFocused({ windowTypes: ["normal"], populate: true });
     } catch {
         return;
     }
-    if (!win || win.id === undefined) return;
+    if (!win || win.id === undefined || !win.tabs) return;
+
+    // Only include tabs that still exist in this window, and skip blank entries.
+    const existing = new Set(win.tabs.map((t) => t.id));
 
     const ordered = [];
     for (const id of getMRU(win.id)) {
+        if (!existing.has(id)) continue;
         const info = tabInfo.get(id);
         if (!info) continue;
+        if (!info.title && !info.url) continue;
         ordered.push({ ...info });
     }
 
