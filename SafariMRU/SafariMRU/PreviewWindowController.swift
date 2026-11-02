@@ -139,6 +139,7 @@ final class PreviewView: NSView {
                     images[i] = img
                 }
             }
+            DebugLog.shared.log("preview favicons: \(images.count)/\(titles.count) matched")
             DispatchQueue.main.async {
                 self?.favicons = images
                 self?.needsDisplay = true

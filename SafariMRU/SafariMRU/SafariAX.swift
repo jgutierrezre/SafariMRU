@@ -107,13 +107,18 @@ final class SafariAX {
     /// Returns a title -> favicon image data map by walking the tab bar once.
     static func faviconDataByTitle() -> [String: Data] {
         var result: [String: Data] = [:]
-        for t in findTabs() {
+        let tabs = findTabs()
+        var noImage = 0
+        for t in tabs {
             let title = strAttr(t, kAXTitleAttribute)
             guard !title.isEmpty, result[title] == nil else { continue }
             if let data = faviconData(for: t) {
                 result[title] = data
+            } else {
+                noImage += 1
             }
         }
+        DebugLog.shared.log("favicons: \(result.count)/\(tabs.count) extracted (\(noImage) without image)")
         return result
     }
 
@@ -123,12 +128,32 @@ final class SafariAX {
             var value: CFTypeRef?
             guard AXUIElementCopyAttributeValue(c, "AXImageData" as CFString, &value) == .success,
                   let value = value else { continue }
+
+            let typeID = CFGetTypeID(value)
+
             if let nsData = value as? NSData {
                 return nsData as Data
             }
-            if CFGetTypeID(value) == CGImage.typeID {
+            if let nsImage = value as? NSImage, let tiff = nsImage.tiffRepresentation,
+               let rep = NSBitmapImageRep(data: tiff) {
+                return rep.representation(using: .png, properties: [:])
+            }
+            if typeID == CGImage.typeID {
                 let image = value as! CGImage
                 return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+            }
+
+            // AXImageData is an array of image representations.
+            if let arr = value as? [Any] {
+                for item in arr {
+                    if let d = item as? NSData {
+                        return d as Data
+                    }
+                    if let img = item as? NSImage, let tiff = img.tiffRepresentation,
+                       let rep = NSBitmapImageRep(data: tiff) {
+                        return rep.representation(using: .png, properties: [:])
+                    }
+                }
             }
         }
         return nil
