@@ -2,22 +2,43 @@
 //  PreviewWindowController.swift
 //  SafariMRU
 //
-//  A borderless, non-activating overlay that shows tab previews (favicon +
-//  title) while cycling, with the current selection highlighted.
+//  A borderless, non-activating overlay that shows tab previews (index, favicon
+//  and title) while cycling, with the current selection highlighted. Cards wrap
+//  into a grid that is clamped to the screen so it never overflows.
 //
 
 import Cocoa
+
+struct PreviewLayout {
+    let columns: Int
+    let cardWidth: CGFloat
+    let cardHeight: CGFloat
+    let gap: CGFloat
+    let margin: CGFloat
+
+    func usedColumns(for count: Int) -> Int { max(1, min(columns, count)) }
+
+    func rows(for count: Int) -> Int {
+        let cols = usedColumns(for: count)
+        return max(1, Int(ceil(Double(count) / Double(cols))))
+    }
+
+    func width(for count: Int) -> CGFloat {
+        let cols = usedColumns(for: count)
+        return CGFloat(cols) * cardWidth + CGFloat(max(0, cols - 1)) * gap + margin * 2
+    }
+
+    func height(for count: Int) -> CGFloat {
+        let r = rows(for: count)
+        return CGFloat(r) * cardHeight + CGFloat(max(0, r - 1)) * gap + margin * 2
+    }
+}
 
 final class PreviewWindowController {
     static let shared = PreviewWindowController()
 
     private let panel: NSPanel
     private let previewView = PreviewView()
-
-    fileprivate static let cardWidth: CGFloat = 200
-    fileprivate static let cardHeight: CGFloat = 56
-    fileprivate static let gap: CGFloat = 10
-    fileprivate static let margin: CGFloat = 16
 
     init() {
         panel = NSPanel(
@@ -35,22 +56,19 @@ final class PreviewWindowController {
     }
 
     func show(tabs: [TabPreview], selected: Int) {
+        let layout = Self.computeLayout(count: tabs.count)
+        previewView.layout = layout
         previewView.tabs = tabs
         previewView.selectedIndex = selected
         previewView.needsDisplay = true
 
-        let count = max(1, tabs.count)
-        let width = CGFloat(count) * Self.cardWidth + CGFloat(count - 1) * Self.gap + Self.margin * 2
-        let height = Self.cardHeight + Self.margin * 2
+        let width = layout.width(for: tabs.count)
+        let height = layout.height(for: tabs.count)
         panel.setContentSize(NSSize(width: width, height: height))
 
-        if let screen = NSScreen.main {
-            let frame = screen.frame
-            panel.setFrameOrigin(NSPoint(
-                x: frame.midX - width / 2,
-                y: frame.midY - height / 2 + frame.height * 0.12
-            ))
-        }
+        let frame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        panel.setFrameOrigin(NSPoint(x: frame.midX - width / 2, y: frame.midY - height / 2))
 
         if !panel.isVisible {
             panel.orderFront(nil)
@@ -60,9 +78,36 @@ final class PreviewWindowController {
     func hide() {
         panel.orderOut(nil)
     }
+
+    /// Compute a grid that fits within 92% of the screen, shrinking cards only
+    /// when there are too many tabs to fit even at the minimum size.
+    private static func computeLayout(count: Int) -> PreviewLayout {
+        let screen = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let maxW = screen.width * 0.92
+        let maxH = screen.height * 0.92
+
+        let gap: CGFloat = 10
+        let margin: CGFloat = 16
+        var cardW: CGFloat = 200
+        var cardH: CGFloat = 56
+
+        while true {
+            let cols = max(1, min(count, Int((maxW - 2 * margin + gap) / (cardW + gap))))
+            let layout = PreviewLayout(columns: cols, cardWidth: cardW, cardHeight: cardH, gap: gap, margin: margin)
+            let fits = layout.width(for: count) <= maxW && layout.height(for: count) <= maxH
+            if fits || (cardW <= 150 && cardH <= 44) {
+                return layout
+            }
+            cardW = max(150, cardW * 0.9)
+            cardH = max(44, cardH * 0.9)
+        }
+    }
 }
 
 final class PreviewView: NSView {
+    var layout = PreviewLayout(columns: 1, cardWidth: 200, cardHeight: 56, gap: 10, margin: 16)
+
     var tabs: [TabPreview] = [] {
         didSet {
             needsDisplay = true
@@ -78,17 +123,21 @@ final class PreviewView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
-        let totalWidth = CGFloat(tabs.count) * PreviewWindowController.cardWidth
-            + CGFloat(max(0, tabs.count - 1)) * PreviewWindowController.gap
-        let startX = (bounds.width - totalWidth) / 2
-        let topY = PreviewWindowController.margin
+        let cols = layout.usedColumns(for: tabs.count)
+        let rows = layout.rows(for: tabs.count)
+        let totalW = CGFloat(cols) * layout.cardWidth + CGFloat(max(0, cols - 1)) * layout.gap
+        let totalH = CGFloat(rows) * layout.cardHeight + CGFloat(max(0, rows - 1)) * layout.gap
+        let startX = (bounds.width - totalW) / 2
+        let startY = (bounds.height - totalH) / 2
 
         for (i, tab) in tabs.enumerated() {
+            let row = i / cols
+            let col = i % cols
             let rect = NSRect(
-                x: startX + CGFloat(i) * (PreviewWindowController.cardWidth + PreviewWindowController.gap),
-                y: topY,
-                width: PreviewWindowController.cardWidth,
-                height: PreviewWindowController.cardHeight
+                x: startX + CGFloat(col) * (layout.cardWidth + layout.gap),
+                y: startY + CGFloat(row) * (layout.cardHeight + layout.gap),
+                width: layout.cardWidth,
+                height: layout.cardHeight
             )
             drawCard(tab, index: i, in: rect)
         }
@@ -116,7 +165,8 @@ final class PreviewView: NSView {
         indexStr.draw(at: NSPoint(x: rect.minX + 10, y: rect.midY - indexSize.height / 2), withAttributes: indexAttrs)
 
         // Favicon
-        let faviconRect = NSRect(x: rect.minX + 30, y: rect.minY + (rect.height - 26) / 2, width: 26, height: 26)
+        let faviconSize = min(26, rect.height - 16)
+        let faviconRect = NSRect(x: rect.minX + 30, y: rect.midY - faviconSize / 2, width: faviconSize, height: faviconSize)
         if let favicon = favicons[tab.title] {
             favicon.draw(in: faviconRect, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
         } else {
