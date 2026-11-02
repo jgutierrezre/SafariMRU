@@ -4,7 +4,7 @@
 //
 //  Ctrl+Tab cycles a preview and switches on Control release (deferred).
 //  Ctrl+1..9 / Ctrl+0 switch to a numbered tab immediately.
-//  Tab order and metadata come from PreviewState (the extension).
+//  The tab order comes from MRUTracker (native, AXObserver-driven).
 //
 
 import Foundation
@@ -27,7 +27,7 @@ final class MRUSwitcher {
         if !isCycling {
             // A cycle must begin with a forward press (Ctrl+Tab).
             if direction < 0 { return }
-            let tabs = Self.currentTabs()
+            let tabs = MRUTracker.shared.tabs()
             guard !tabs.isEmpty else { return }
             cycleTabs = tabs
             isCycling = true
@@ -57,12 +57,13 @@ final class MRUSwitcher {
         guard isCycling else { return }
         let idx = number == 0 ? cycleTabs.count - 1 : number - 1
         guard idx >= 0 && idx < cycleTabs.count else { return }
-        let tabs = cycleTabs
+        let target = cycleTabs[idx]
         isCycling = false
         cycleTabs = []
         selection = 0
         DispatchQueue.main.async {
-            SafariAX.switchToTab(title: tabs[idx].title, fallbackIndex: tabs[idx].index)
+            SafariAX.switchToTab(title: target.title, fallbackIndex: target.index)
+            MRUTracker.shared.promote(target.title)
             PreviewWindowController.shared.hide()
         }
     }
@@ -75,24 +76,8 @@ final class MRUSwitcher {
             } else {
                 SafariAX.switchToTab(index: number - 1)
             }
+            MRUTracker.shared.sync()
         }
-    }
-
-    /// Prefer the extension's state; fall back to AX tab titles when it's empty.
-    private static func currentTabs() -> [TabPreview] {
-        let ext = PreviewState.shared.tabs
-        if !ext.isEmpty { return ext }
-
-        guard let (active, titles) = SafariAX.getTabInfo() else { return [] }
-        var result: [TabPreview] = []
-        for (i, title) in titles.enumerated() {
-            result.append(TabPreview(title: title, url: "", index: i))
-        }
-        if active >= 0 && active < result.count {
-            let a = result.remove(at: active)
-            result.insert(a, at: 0)
-        }
-        return result
     }
 
     private func updatePreview() {
@@ -114,6 +99,7 @@ final class MRUSwitcher {
         DispatchQueue.main.async {
             if idx >= 0 && idx < tabs.count {
                 SafariAX.switchToTab(title: tabs[idx].title, fallbackIndex: tabs[idx].index)
+                MRUTracker.shared.promote(tabs[idx].title)
             }
             PreviewWindowController.shared.hide()
         }
