@@ -65,14 +65,13 @@ final class PreviewWindowController {
 final class PreviewView: NSView {
     var tabs: [TabPreview] = [] {
         didSet {
-            favicons.removeAll()
             needsDisplay = true
-            loadFavicons()
+            loadMissingFavicons()
         }
     }
     var selectedIndex = 0
 
-    private var favicons: [Int: NSImage] = [:]
+    private var favicons: [String: NSImage] = [:]
 
     override var isFlipped: Bool { true }
 
@@ -109,7 +108,7 @@ final class PreviewView: NSView {
 
         // Favicon
         let faviconRect = NSRect(x: rect.minX + 10, y: rect.minY + (rect.height - 28) / 2, width: 28, height: 28)
-        if let favicon = favicons[index] {
+        if let favicon = favicons[tab.title] {
             favicon.draw(in: faviconRect, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
         } else {
             NSColor.white.withAlphaComponent(0.12).setFill()
@@ -129,20 +128,22 @@ final class PreviewView: NSView {
         (title as NSString).draw(in: titleRect, withAttributes: attrs)
     }
 
-    private func loadFavicons() {
-        let titles = tabs.map { $0.title }
+    private func loadMissingFavicons() {
+        let missing = tabs.map { $0.title }.filter { !$0.isEmpty && favicons[$0] == nil }
+        guard !missing.isEmpty else { return }
+
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let favicons = SafariAX.faviconDataByTitle()
-            var images: [Int: NSImage] = [:]
-            for (i, title) in titles.enumerated() {
-                if let data = favicons[title], let img = NSImage(data: data) {
-                    images[i] = img
+            let all = SafariAX.faviconDataByTitle()
+            var loaded: [String: NSImage] = [:]
+            for title in missing {
+                if let data = all[title], let img = NSImage(data: data) {
+                    loaded[title] = img
                 }
             }
-            DebugLog.shared.log("preview favicons: \(images.count)/\(titles.count) matched")
             DispatchQueue.main.async {
-                self?.favicons = images
-                self?.needsDisplay = true
+                guard let self = self else { return }
+                for (title, img) in loaded { self.favicons[title] = img }
+                self.needsDisplay = true
             }
         }
     }
