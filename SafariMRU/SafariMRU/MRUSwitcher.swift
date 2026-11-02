@@ -57,8 +57,14 @@ final class MRUSwitcher {
         guard isCycling else { return }
         let idx = number == 0 ? cycleTabs.count - 1 : number - 1
         guard idx >= 0 && idx < cycleTabs.count else { return }
-        selection = idx
-        switchToSelection()
+        let tabs = cycleTabs
+        isCycling = false
+        cycleTabs = []
+        selection = 0
+        DispatchQueue.main.async {
+            SafariAX.switchToTab(title: tabs[idx].title, fallbackIndex: tabs[idx].index)
+            PreviewWindowController.shared.hide()
+        }
     }
 
     /// Switch directly to a tab-bar position (immediate): 1...n, or 0 for the last.
@@ -93,17 +99,6 @@ final class MRUSwitcher {
         let tabs = cycleTabs
         let idx = selection
         DispatchQueue.main.async {
-            PreviewWindowController.shared.show(tabs: tabs, selected: idx)
-        }
-    }
-
-    /// Immediately switch to the current selection and refresh the preview.
-    private func switchToSelection() {
-        let tabs = cycleTabs
-        let idx = selection
-        DispatchQueue.main.async {
-            guard idx >= 0 && idx < tabs.count else { return }
-            SafariAX.switchToTab(title: tabs[idx].title, fallbackIndex: tabs[idx].index)
             PreviewWindowController.shared.show(tabs: tabs, selected: idx)
         }
     }

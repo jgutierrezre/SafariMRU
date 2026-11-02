@@ -100,9 +100,9 @@ final class ShortcutInterceptor {
 
             if isCtrl && !isCmdOrOpt, let number = numberKeys[keyCode] {
                 if isCycling {
-                    MRUSwitcher.shared.jumpToStackIndex(number - 1)
+                    MRUSwitcher.shared.jumpToStackIndex(number)
                 } else {
-                    MRUSwitcher.shared.jumpToTabBarIndex(number - 1)
+                    MRUSwitcher.shared.jumpToTabBarIndex(number)
                 }
                 return nil
             }
