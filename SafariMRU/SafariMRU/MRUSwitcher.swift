@@ -2,10 +2,9 @@
 //  MRUSwitcher.swift
 //  SafariMRU
 //
-//  Deferred tab switching: while Control is held, stepping through the MRU list
-//  only moves the preview selection; the actual tab switch happens on commit
-//  (Control release). Tab order and metadata come from PreviewState, which the
-//  Safari extension populates.
+//  Immediate MRU switching: each Ctrl+Tab / Tab switches to the next tab right
+//  away, while the preview overlay shows the frozen MRU order and the current
+//  selection. Tab order and metadata come from PreviewState (the extension).
 //
 
 import Foundation
@@ -21,26 +20,8 @@ final class MRUSwitcher {
 
     func cycleForward() { queue.async { self.step(1) } }
     func cycleBackward() { queue.async { self.step(-1) } }
-    func commit() { queue.async { self.doCommit() } }
-    func cancel() { queue.async { self.doCancel() } }
-
-    /// Jump to the Nth item of the active MRU cycle (0 = most recent).
-    func jumpToStackIndex(_ index: Int) {
-        queue.async { self.doJumpStack(index) }
-    }
-
-    private func doJumpStack(_ index: Int) {
-        guard isCycling, index >= 0, index < cycleTabs.count else { return }
-        selection = index
-        updatePreview()
-    }
-
-    /// Switch directly to the tab at the given 0-based tab-bar position.
-    func jumpToTabBarIndex(_ index: Int) {
-        DispatchQueue.main.async {
-            SafariAX.switchToTab(index: index)
-        }
-    }
+    func commit() { queue.async { self.endCycle() } }
+    func cancel() { queue.async { self.endCycle() } }
 
     private func step(_ direction: Int) {
         if !isCycling {
@@ -63,7 +44,31 @@ final class MRUSwitcher {
             if selection < 0 { selection = cycleTabs.count - 1 }
         }
 
-        updatePreview()
+        activateSelection()
+    }
+
+    /// Jump to a numbered position in the active cycle: 1...n, or 0 for the last.
+    func jumpToStackIndex(_ number: Int) {
+        queue.async { self.doJumpStack(number) }
+    }
+
+    private func doJumpStack(_ number: Int) {
+        guard isCycling else { return }
+        let idx = number == 0 ? cycleTabs.count - 1 : number - 1
+        guard idx >= 0 && idx < cycleTabs.count else { return }
+        selection = idx
+        activateSelection()
+    }
+
+    /// Switch directly to a tab-bar position: 1...n, or 0 for the last (rightmost).
+    func jumpToTabBarIndex(_ number: Int) {
+        DispatchQueue.main.async {
+            if number == 0 {
+                SafariAX.switchToLastTab()
+            } else {
+                SafariAX.switchToTab(index: number - 1)
+            }
+        }
     }
 
     /// Prefer the extension's state; fall back to AX tab titles when it's empty.
@@ -83,39 +88,24 @@ final class MRUSwitcher {
         return result
     }
 
-    private func doCommit() {
-        guard isCycling else { return }
+    /// Switch to the current selection immediately and refresh the preview.
+    private func activateSelection() {
         let tabs = cycleTabs
-        let target = selection
-        isCycling = false
-        cycleTabs = []
-        selection = 0
-
+        let idx = selection
         DispatchQueue.main.async {
-            let t0 = Date()
-            if target >= 0 && target < tabs.count {
-                SafariAX.switchToTab(title: tabs[target].title, fallbackIndex: tabs[target].index)
-            }
-            DebugLog.shared.log("commit: switch took \(Int(Date().timeIntervalSince(t0) * 1000))ms (target \(target) of \(tabs.count))")
-            PreviewWindowController.shared.hide()
+            guard idx >= 0 && idx < tabs.count else { return }
+            SafariAX.switchToTab(title: tabs[idx].title, fallbackIndex: tabs[idx].index)
+            PreviewWindowController.shared.show(tabs: tabs, selected: idx)
         }
     }
 
-    private func doCancel() {
+    private func endCycle() {
         guard isCycling else { return }
         isCycling = false
         cycleTabs = []
         selection = 0
         DispatchQueue.main.async {
             PreviewWindowController.shared.hide()
-        }
-    }
-
-    private func updatePreview() {
-        let tabs = cycleTabs
-        let sel = selection
-        DispatchQueue.main.async {
-            PreviewWindowController.shared.show(tabs: tabs, selected: sel)
         }
     }
 }

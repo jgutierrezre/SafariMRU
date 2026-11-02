@@ -13,9 +13,9 @@ import ApplicationServices
 private let kVK_Tab: CGKeyCode = 48
 private let kVK_Escape: CGKeyCode = 53
 
-/// Top-row number keys → 1-based tab number (0 is the 10th).
+/// Top-row number keys → 1-based tab number (0 is the last tab).
 private let numberKeys: [CGKeyCode: Int] = [
-    18: 1, 19: 2, 20: 3, 21: 4, 23: 5, 22: 6, 26: 7, 28: 8, 25: 9, 29: 10,
+    18: 1, 19: 2, 20: 3, 21: 4, 23: 5, 22: 6, 26: 7, 28: 8, 25: 9, 29: 0,
 ]
 
 final class ShortcutInterceptor {

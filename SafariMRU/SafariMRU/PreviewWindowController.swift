@@ -106,8 +106,17 @@ final class PreviewView: NSView {
         (selected ? NSColor.controlAccentColor : NSColor.white.withAlphaComponent(0.3)).setStroke()
         border.stroke()
 
+        // Index label (left)
+        let indexAttrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor.white.withAlphaComponent(0.55),
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
+        ]
+        let indexStr = "\(index + 1)" as NSString
+        let indexSize = indexStr.size(withAttributes: indexAttrs)
+        indexStr.draw(at: NSPoint(x: rect.minX + 10, y: rect.midY - indexSize.height / 2), withAttributes: indexAttrs)
+
         // Favicon
-        let faviconRect = NSRect(x: rect.minX + 10, y: rect.minY + (rect.height - 28) / 2, width: 28, height: 28)
+        let faviconRect = NSRect(x: rect.minX + 30, y: rect.minY + (rect.height - 26) / 2, width: 26, height: 26)
         if let favicon = favicons[tab.title] {
             favicon.draw(in: faviconRect, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
         } else {
@@ -117,7 +126,7 @@ final class PreviewView: NSView {
 
         // Title
         let title = tab.title.isEmpty ? tab.url : tab.title
-        let titleRect = NSRect(x: rect.minX + 46, y: rect.minY + (rect.height - 18) / 2, width: rect.width - 76, height: 20)
+        let titleRect = NSRect(x: rect.minX + 64, y: rect.minY + (rect.height - 18) / 2, width: rect.width - 72, height: 20)
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byTruncatingTail
         let attrs: [NSAttributedString.Key: Any] = [
@@ -126,18 +135,6 @@ final class PreviewView: NSView {
             .paragraphStyle: paragraph,
         ]
         (title as NSString).draw(in: titleRect, withAttributes: attrs)
-
-        // Number badge (top-right)
-        let badgeRect = NSRect(x: rect.maxX - 24, y: rect.minY + 5, width: 18, height: 18)
-        NSColor.controlAccentColor.setFill()
-        NSBezierPath(ovalIn: badgeRect).fill()
-        let numAttrs: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor.white,
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .bold),
-        ]
-        let numStr = "\(index + 1)" as NSString
-        let numSize = numStr.size(withAttributes: numAttrs)
-        numStr.draw(at: NSPoint(x: badgeRect.midX - numSize.width / 2, y: badgeRect.midY - numSize.height / 2), withAttributes: numAttrs)
     }
 
     private func loadMissingFavicons() {

@@ -112,6 +112,13 @@ final class SafariAX {
         AXUIElementPerformAction(tabs[index], kAXPressAction as CFString)
     }
 
+    /// Switch to the rightmost (last) tab.
+    static func switchToLastTab() {
+        let tabs = findTabs()
+        guard let last = tabs.last else { return }
+        AXUIElementPerformAction(last, kAXPressAction as CFString)
+    }
+
     /// Returns a title -> favicon image data map by walking the tab bar once.
     static func faviconDataByTitle() -> [String: Data] {
         var result: [String: Data] = [:]
