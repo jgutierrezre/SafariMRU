@@ -98,7 +98,7 @@ final class ShortcutInterceptor {
                 return nil // swallow so Safari does not switch sequentially
             }
 
-            if isCtrl && !isCmdOrOpt, let number = numberKeys[keyCode] {
+            if Settings.numberShortcutsEnabled, isCtrl && !isCmdOrOpt, let number = numberKeys[keyCode] {
                 if isCycling {
                     MRUSwitcher.shared.jumpToStackIndex(number)
                 } else {
