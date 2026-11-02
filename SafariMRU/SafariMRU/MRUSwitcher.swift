@@ -24,6 +24,24 @@ final class MRUSwitcher {
     func commit() { queue.async { self.doCommit() } }
     func cancel() { queue.async { self.doCancel() } }
 
+    /// Jump to the Nth item of the active MRU cycle (0 = most recent).
+    func jumpToStackIndex(_ index: Int) {
+        queue.async { self.doJumpStack(index) }
+    }
+
+    private func doJumpStack(_ index: Int) {
+        guard isCycling, index >= 0, index < cycleTabs.count else { return }
+        selection = index
+        updatePreview()
+    }
+
+    /// Switch directly to the tab at the given 0-based tab-bar position.
+    func jumpToTabBarIndex(_ index: Int) {
+        DispatchQueue.main.async {
+            SafariAX.switchToTab(index: index)
+        }
+    }
+
     private func step(_ direction: Int) {
         if !isCycling {
             // A cycle must begin with a forward press (Ctrl+Tab).

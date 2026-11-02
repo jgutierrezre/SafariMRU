@@ -13,6 +13,11 @@ import ApplicationServices
 private let kVK_Tab: CGKeyCode = 48
 private let kVK_Escape: CGKeyCode = 53
 
+/// Top-row number keys → 1-based tab number (0 is the 10th).
+private let numberKeys: [CGKeyCode: Int] = [
+    18: 1, 19: 2, 20: 3, 21: 4, 23: 5, 22: 6, 26: 7, 28: 8, 25: 9, 29: 10,
+]
+
 final class ShortcutInterceptor {
     static let shared = ShortcutInterceptor()
 
@@ -91,6 +96,15 @@ final class ShortcutInterceptor {
                     MRUSwitcher.shared.cycleForward()
                 }
                 return nil // swallow so Safari does not switch sequentially
+            }
+
+            if isCtrl && !isCmdOrOpt, let number = numberKeys[keyCode] {
+                if isCycling {
+                    MRUSwitcher.shared.jumpToStackIndex(number - 1)
+                } else {
+                    MRUSwitcher.shared.jumpToTabBarIndex(number - 1)
+                }
+                return nil
             }
         }
 

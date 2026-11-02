@@ -117,7 +117,7 @@ final class PreviewView: NSView {
 
         // Title
         let title = tab.title.isEmpty ? tab.url : tab.title
-        let titleRect = NSRect(x: rect.minX + 46, y: rect.minY + (rect.height - 18) / 2, width: rect.width - 54, height: 20)
+        let titleRect = NSRect(x: rect.minX + 46, y: rect.minY + (rect.height - 18) / 2, width: rect.width - 76, height: 20)
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byTruncatingTail
         let attrs: [NSAttributedString.Key: Any] = [
@@ -126,6 +126,18 @@ final class PreviewView: NSView {
             .paragraphStyle: paragraph,
         ]
         (title as NSString).draw(in: titleRect, withAttributes: attrs)
+
+        // Number badge (top-right)
+        let badgeRect = NSRect(x: rect.maxX - 24, y: rect.minY + 5, width: 18, height: 18)
+        NSColor.controlAccentColor.setFill()
+        NSBezierPath(ovalIn: badgeRect).fill()
+        let numAttrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor.white,
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .bold),
+        ]
+        let numStr = "\(index + 1)" as NSString
+        let numSize = numStr.size(withAttributes: numAttrs)
+        numStr.draw(at: NSPoint(x: badgeRect.midX - numSize.width / 2, y: badgeRect.midY - numSize.height / 2), withAttributes: numAttrs)
     }
 
     private func loadMissingFavicons() {

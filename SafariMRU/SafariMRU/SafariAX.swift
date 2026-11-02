@@ -105,6 +105,13 @@ final class SafariAX {
         }
     }
 
+    /// Switch to the tab at the given 0-based tab-bar position (leftmost = 0).
+    static func switchToTab(index: Int) {
+        let tabs = findTabs()
+        guard index >= 0 && index < tabs.count else { return }
+        AXUIElementPerformAction(tabs[index], kAXPressAction as CFString)
+    }
+
     /// Returns a title -> favicon image data map by walking the tab bar once.
     static func faviconDataByTitle() -> [String: Data] {
         var result: [String: Data] = [:]
