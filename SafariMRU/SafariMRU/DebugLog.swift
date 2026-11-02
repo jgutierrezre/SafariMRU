@@ -5,7 +5,7 @@
 //  Minimal file logger for diagnosing the extension -> app pipeline.
 //
 
-import Cocoa
+import Foundation
 
 final class DebugLog {
     static let shared = DebugLog()

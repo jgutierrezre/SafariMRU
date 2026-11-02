@@ -9,7 +9,6 @@
 import Cocoa
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem?
     private var settingsWindow: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -17,7 +16,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.autosaveName = "SafariMRU"
-        statusItem = item
 
         if let button = item.button {
             button.image = NSImage(systemSymbolName: "arrow.left.arrow.right", accessibilityDescription: "Safari MRU")

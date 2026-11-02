@@ -8,7 +8,7 @@
 //  Safari extension populates.
 //
 
-import Cocoa
+import Foundation
 
 final class MRUSwitcher {
     static let shared = MRUSwitcher()
@@ -56,7 +56,7 @@ final class MRUSwitcher {
         guard let (active, titles) = SafariAX.getTabInfo() else { return [] }
         var result: [TabPreview] = []
         for (i, title) in titles.enumerated() {
-            result.append(TabPreview(title: title, url: "", favIconUrl: "", index: i))
+            result.append(TabPreview(title: title, url: "", index: i))
         }
         if active >= 0 && active < result.count {
             let a = result.remove(at: active)

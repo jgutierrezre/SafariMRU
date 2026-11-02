@@ -6,7 +6,7 @@
 //  extension (see extension/background.js) and applies them to PreviewState.
 //
 
-import Cocoa
+import Foundation
 import Network
 
 final class LocalServer {

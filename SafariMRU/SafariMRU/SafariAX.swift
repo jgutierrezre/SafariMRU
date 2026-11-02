@@ -25,10 +25,11 @@ final class SafariAX {
     private static func focusedWindow() -> AXUIElement? {
         guard let app = safariApp() else { return nil }
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value) == .success else {
+        guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value) == .success,
+              let window = value else {
             return nil
         }
-        return value as! AXUIElement
+        return unsafeBitCast(window, to: AXUIElement.self)
     }
 
     private static func attr(_ el: AXUIElement, _ name: String) -> AnyObject? {

@@ -6,12 +6,11 @@
 //  the MRU-ordered list of tabs with metadata for the preview.
 //
 
-import Cocoa
+import Foundation
 
 struct TabPreview {
     let title: String
     let url: String
-    let favIconUrl: String
     let index: Int
 }
 
@@ -37,13 +36,12 @@ final class PreviewState {
             parsed.append(TabPreview(
                 title: t["title"] as? String ?? "",
                 url: t["url"] as? String ?? "",
-                favIconUrl: t["favIconUrl"] as? String ?? "",
                 index: t["index"] as? Int ?? 0
             ))
         }
         lock.lock()
         _tabs = parsed
         lock.unlock()
-        DebugLog.shared.log("PreviewState: \(parsed.count) tabs -> \(parsed.map { "\($0.title)[fav=\($0.favIconUrl.isEmpty ? "no" : $0.favIconUrl)]" })")
+        DebugLog.shared.log("PreviewState: \(parsed.count) tabs")
     }
 }

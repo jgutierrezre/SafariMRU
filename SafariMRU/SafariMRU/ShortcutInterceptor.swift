@@ -17,7 +17,6 @@ final class ShortcutInterceptor {
     static let shared = ShortcutInterceptor()
 
     private var eventTap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
     private var isCycling = false
 
     private let safariBundleID = "com.apple.Safari"
@@ -41,7 +40,6 @@ final class ShortcutInterceptor {
 
         eventTap = tap
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
     }

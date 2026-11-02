@@ -5,7 +5,7 @@ const PORT = 49153;
 const STATE_URL = `http://127.0.0.1:${PORT}/state`;
 
 const windowMRU = new Map();   // windowId -> [tabId, ...] most-recent first
-const tabInfo = new Map();     // tabId -> { title, url, favIconUrl, index }
+const tabInfo = new Map();     // tabId -> { title, url, index }
 
 function getMRU(windowId) {
     if (!windowMRU.has(windowId)) windowMRU.set(windowId, []);
@@ -25,7 +25,6 @@ async function refreshTabInfo(tabId) {
         tabInfo.set(tabId, {
             title: t.title || "",
             url: t.url || "",
-            favIconUrl: t.favIconUrl || "",
             index: t.index ?? 0,
         });
     } catch {
@@ -83,7 +82,7 @@ browser.tabs.onRemoved.addListener((tabId) => {
 });
 
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
-    if (changeInfo.title || changeInfo.favIconUrl) {
+    if (changeInfo.title) {
         await refreshTabInfo(tabId);
         await pushState();
     }
@@ -103,7 +102,6 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
                 tabInfo.set(t.id, {
                     title: t.title || "",
                     url: t.url || "",
-                    favIconUrl: t.favIconUrl || "",
                     index: t.index ?? 0,
                 });
             }
