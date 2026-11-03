@@ -33,6 +33,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ShortcutInterceptor.shared.start()
         _ = PreviewWindowController.shared // create the panel on the main thread
         MRUTracker.shared.start()
+        ThumbnailStore.shared.start()
     }
 
     @objc private func openSettings() {

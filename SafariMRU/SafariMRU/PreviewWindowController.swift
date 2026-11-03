@@ -41,6 +41,7 @@ final class PreviewWindowController {
     private let previewView = PreviewView()
 
     var windowNumber: Int { panel.windowNumber }
+    var isVisible: Bool { panel.isVisible }
 
     init() {
         panel = NSPanel(
@@ -87,6 +88,11 @@ final class PreviewWindowController {
         panel.orderOut(nil)
     }
 
+    func refresh() {
+        guard panel.isVisible else { return }
+        previewView.needsDisplay = true
+    }
+
     private static func computeLayout(count: Int, thumbnails: Bool) -> PreviewLayout {
         let screen = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
             ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -126,10 +132,42 @@ final class PreviewView: NSView {
 
     private var favicons: [String: NSImage] = [:]
     private var cardRects: [(index: Int, rect: NSRect)] = []
+    private var hoveredIndex: Int?
+    private var trackingArea: NSTrackingArea?
 
     override var isFlipped: Bool { true }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea = trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let idx = cardRects.first(where: { $0.rect.contains(point) })?.index
+        if idx != hoveredIndex {
+            hoveredIndex = idx
+            needsDisplay = true
+        }
+        if idx != nil {
+            NSCursor.pointingHand.set()
+        } else {
+            NSCursor.arrow.set()
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        if hoveredIndex != nil {
+            hoveredIndex = nil
+            needsDisplay = true
+        }
+        NSCursor.arrow.set()
+    }
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
@@ -172,9 +210,14 @@ final class PreviewView: NSView {
         (selected ? NSColor.controlAccentColor.withAlphaComponent(0.3) : NSColor.black.withAlphaComponent(0.55)).setFill()
         bg.fill()
 
+        let hovered = index == hoveredIndex && !selected
+
         let border = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
-        border.lineWidth = selected ? 2.5 : 1
-        (selected ? NSColor.controlAccentColor : NSColor.white.withAlphaComponent(0.3)).setStroke()
+        border.lineWidth = selected ? 2.5 : (hovered ? 1.5 : 1)
+        let strokeColor: NSColor = selected
+            ? NSColor.controlAccentColor
+            : (hovered ? NSColor.white.withAlphaComponent(0.65) : NSColor.white.withAlphaComponent(0.3))
+        strokeColor.setStroke()
         border.stroke()
 
         if showThumbnails {

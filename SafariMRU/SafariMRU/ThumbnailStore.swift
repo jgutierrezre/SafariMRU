@@ -2,21 +2,32 @@
 //  ThumbnailStore.swift
 //  SafariMRU
 //
-//  Captures a preview of the visible Safari tab via ScreenCaptureKit, cropping
-//  to the web-content area and clamping to the visible display. Cached per tab.
-//  The preview overlay is excluded from the capture so it never appears in a
-//  thumbnail. Requires Screen Recording permission.
+//  Periodically captures the currently-visible Safari tab via ScreenCaptureKit
+//  while the preview overlay is closed, so the overlay never appears in a
+//  thumbnail and the current tab's preview stays reasonably fresh. Cached per
+//  tab. Requires Screen Recording permission.
 //
 
 import Cocoa
 import CoreGraphics
 import ScreenCaptureKit
 
-final class ThumbnailStore {
+final class ThumbnailStore: @unchecked Sendable {
     static let shared = ThumbnailStore()
 
     private let lock = NSLock()
     private var cache: [String: NSImage] = [:]
+    private var timer: DispatchSourceTimer?
+    private var capturing = false
+    private let interval: TimeInterval = 3.0
+
+    func start() {
+        let t = DispatchSource.makeTimerSource(queue: .main)
+        t.schedule(deadline: .now() + interval, repeating: interval)
+        t.setEventHandler { [weak self] in self?.tick() }
+        t.resume()
+        timer = t
+    }
 
     func image(for title: String) -> NSImage? {
         lock.lock()
@@ -34,22 +45,22 @@ final class ThumbnailStore {
         CGPreflightScreenCaptureAccess()
     }
 
-    /// Capture the currently-visible tab, cached under `title`.
-    /// `delay` gives a freshly-switched tab time to render (0 for the current tab).
-    func captureActiveTab(title: String, delay: TimeInterval = 0.2) {
-        guard Settings.thumbnailsEnabled else { return }
-        guard CGPreflightScreenCaptureAccess() else { return }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self = self else { return }
-            guard let frame = SafariAX.webContentFrame(), frame.width > 20, frame.height > 20 else { return }
-            self.capture(webRect: frame, title: title)
+    private func tick() {
+        guard !capturing else { return }
+        guard Settings.thumbnailsEnabled, CGPreflightScreenCaptureAccess() else { return }
+        guard !PreviewWindowController.shared.isVisible else { return }
+        guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.Safari" else { return }
+        guard let title = MRUTracker.shared.currentActiveTitle,
+              let frame = SafariAX.webContentFrame(), frame.width > 20, frame.height > 20 else {
+            return
         }
+        capturing = true
+        capture(webRect: frame, title: title)
     }
 
     private func capture(webRect: CGRect, title: String) {
-        // Read the preview window id on the calling (main) thread — creating the
-        // NSPanel off the main thread would crash.
+        // Read the preview window id on the main thread — creating the NSPanel
+        // off the main thread would crash.
         let previewWindowID = PreviewWindowController.shared.windowNumber
 
         Task.detached(priority: .utility) { [weak self] in
@@ -59,15 +70,19 @@ final class ThumbnailStore {
 
                 let center = CGPoint(x: webRect.midX, y: webRect.minY + 10)
                 guard let display = content.displays.first(where: { $0.frame.contains(center) }) ?? content.displays.first else {
+                    self.finishCapture()
                     return
                 }
 
-                // The AX web area reports the full scrollable content height (often
-                // far taller than the screen). Clamp to the visible display area.
+                // The AX web area reports the full scrollable content height; clamp
+                // to the visible display area.
                 let visible = webRect.intersection(display.frame)
-                guard visible.width > 20, visible.height > 20 else { return }
+                guard visible.width > 20, visible.height > 20 else {
+                    self.finishCapture()
+                    return
+                }
 
-                // Exclude our own preview overlay so it never appears in a thumbnail.
+                // Belt-and-suspenders: never include our own preview overlay.
                 let excluding = content.windows.filter { Int($0.windowID) == previewWindowID }
                 let filter = SCContentFilter(display: display, excludingWindows: excluding)
 
@@ -88,8 +103,12 @@ final class ThumbnailStore {
                 let nsImage = NSImage(cgImage: final, size: NSSize(width: final.width, height: final.height))
 
                 self.store(nsImage, for: title)
+                DispatchQueue.main.async {
+                    self.capturing = false
+                    PreviewWindowController.shared.refresh()
+                }
             } catch {
-                // Permission not granted or capture failed; skip.
+                self.finishCapture()
             }
         }
     }
@@ -98,6 +117,12 @@ final class ThumbnailStore {
         lock.lock()
         cache[title] = image
         lock.unlock()
+    }
+
+    private func finishCapture() {
+        DispatchQueue.main.async {
+            self.capturing = false
+        }
     }
 
     private static func downscale(_ cg: CGImage, maxWidth: Int) -> CGImage? {

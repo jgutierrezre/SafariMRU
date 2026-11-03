@@ -32,12 +32,6 @@ final class MRUSwitcher {
             cycleTabs = tabs
             isCycling = true
             selection = 0
-
-            // Capture the current tab the moment the cycle begins. The preview
-            // overlay is excluded from the capture, so it never appears in it.
-            if let title = MRUTracker.shared.currentActiveTitle {
-                ThumbnailStore.shared.captureActiveTab(title: title, delay: 0)
-            }
         }
 
         guard cycleTabs.count > 1 else { return }
@@ -68,7 +62,6 @@ final class MRUSwitcher {
         DispatchQueue.main.async {
             SafariAX.switchToTab(title: target.title, fallbackIndex: target.index)
             MRUTracker.shared.promote(target.title)
-            ThumbnailStore.shared.captureActiveTab(title: target.title)
             PreviewWindowController.shared.hide()
         }
     }
@@ -89,7 +82,6 @@ final class MRUSwitcher {
         DispatchQueue.main.async {
             SafariAX.switchToTab(title: target.title, fallbackIndex: target.index)
             MRUTracker.shared.promote(target.title)
-            ThumbnailStore.shared.captureActiveTab(title: target.title)
             PreviewWindowController.shared.hide()
         }
     }
@@ -99,16 +91,12 @@ final class MRUSwitcher {
         DispatchQueue.main.async {
             MRUTracker.shared.sync()
             let idx = number == 0 ? MRUTracker.shared.tabCount - 1 : number - 1
-            let title = MRUTracker.shared.title(atBarIndex: idx)
             if number == 0 {
                 SafariAX.switchToLastTab()
             } else {
                 SafariAX.switchToTab(index: idx)
             }
             MRUTracker.shared.sync()
-            if let title = title {
-                ThumbnailStore.shared.captureActiveTab(title: title)
-            }
         }
     }
 
@@ -132,7 +120,6 @@ final class MRUSwitcher {
             if idx >= 0 && idx < tabs.count {
                 SafariAX.switchToTab(title: tabs[idx].title, fallbackIndex: tabs[idx].index)
                 MRUTracker.shared.promote(tabs[idx].title)
-                ThumbnailStore.shared.captureActiveTab(title: tabs[idx].title)
             }
             PreviewWindowController.shared.hide()
         }
