@@ -20,6 +20,7 @@ final class ThumbnailStore: @unchecked Sendable {
     private var cache: [String: NSImage] = [:]
     private var timer: DispatchSourceTimer?
     private var capturing = false
+    private var warnedAboutScreenRecording = false
     private let interval: TimeInterval = 3.0
 
     func start() {
@@ -46,6 +47,38 @@ final class ThumbnailStore: @unchecked Sendable {
         CGRequestScreenCaptureAccess()
         Task.detached(priority: .utility) {
             _ = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        }
+
+        // On macOS 27 the request alone does not reliably add the app to the
+        // privacy list, so if the permission is still missing, tell the user
+        // exactly where to add it instead of silently showing no thumbnails.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self = self,
+                  Settings.thumbnailsEnabled,
+                  !CGPreflightScreenCaptureAccess(),
+                  !self.warnedAboutScreenRecording else { return }
+            self.warnedAboutScreenRecording = true
+            self.showScreenRecordingAlert()
+        }
+    }
+
+    private func showScreenRecordingAlert() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let alert = NSAlert()
+        alert.messageText = "Screen Recording permission needed"
+        alert.informativeText = """
+            Tab thumbnails need Screen Recording access.
+
+            Open System Settings → Privacy & Security → Screen & Audio Recording, \
+            enable Safari MRU (or add it with “+”), then quit and reopen Safari MRU.
+            """
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Later")
+
+        if alert.runModal() == .alertFirstButtonReturn,
+           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
         }
     }
 
