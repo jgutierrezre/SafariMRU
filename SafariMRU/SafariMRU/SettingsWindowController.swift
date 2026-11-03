@@ -3,11 +3,13 @@
 //  SafariMRU
 //
 //  Settings window: launch-at-login, Ctrl+number shortcuts, tab thumbnails.
+//  Built with SwiftUI's grouped Form for a native macOS settings look.
 //
 
 import Cocoa
 import CoreGraphics
 import ServiceManagement
+import SwiftUI
 
 enum Settings {
     private static let numberShortcutsKey = "enableNumberShortcuts"
@@ -26,49 +28,57 @@ enum Settings {
     }
 }
 
-final class SettingsWindowController: NSWindowController {
-    convenience init() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 210),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Safari MRU"
-        window.isReleasedWhenClosed = false
-        self.init(window: window)
+@MainActor
+struct SettingsView: View {
+    @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
+    @State private var numberShortcuts = Settings.numberShortcutsEnabled
+    @State private var thumbnails = Settings.thumbnailsEnabled
 
-        let content = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 210))
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Launch at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, newValue in
+                        setLogin(newValue)
+                    }
+            }
 
-        let loginCheckbox = NSButton(checkboxWithTitle: "Launch at login", target: self, action: #selector(toggleLogin(_:)))
-        loginCheckbox.frame = NSRect(x: 20, y: 172, width: 300, height: 22)
-        loginCheckbox.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
-        content.addSubview(loginCheckbox)
+            Section {
+                Toggle("Enable Ctrl+1–9 tab shortcuts", isOn: $numberShortcuts)
+                    .onChange(of: numberShortcuts) { _, newValue in
+                        Settings.numberShortcutsEnabled = newValue
+                    }
+            } footer: {
+                Text("Ctrl+1–9 jumps to a tab — MRU order during a cycle, tab-bar order otherwise. Turn this off if it conflicts with Mission Control space switching.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
-        let numberCheckbox = NSButton(checkboxWithTitle: "Enable Ctrl+1–9 tab shortcuts", target: self, action: #selector(toggleNumberShortcuts(_:)))
-        numberCheckbox.frame = NSRect(x: 20, y: 144, width: 320, height: 22)
-        numberCheckbox.state = Settings.numberShortcutsEnabled ? .on : .off
-        content.addSubview(numberCheckbox)
-
-        let thumbsCheckbox = NSButton(checkboxWithTitle: "Show tab thumbnails (requires Screen Recording)", target: self, action: #selector(toggleThumbnails(_:)))
-        thumbsCheckbox.frame = NSRect(x: 20, y: 116, width: 320, height: 22)
-        thumbsCheckbox.state = Settings.thumbnailsEnabled ? .on : .off
-        content.addSubview(thumbsCheckbox)
-
-        let note = NSTextField(labelWithString: "Ctrl+1–9 jumps to a tab (MRU order during a cycle, tab-bar order otherwise). Thumbnails capture the visible tab only, so they build up as you visit tabs.")
-        note.frame = NSRect(x: 20, y: 40, width: 320, height: 66)
-        note.lineBreakMode = .byWordWrapping
-        note.textColor = .secondaryLabelColor
-        note.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
-        content.addSubview(note)
-
-        window.contentView = content
-        window.center()
+            Section {
+                Toggle("Show tab thumbnails", isOn: $thumbnails)
+                    .onChange(of: thumbnails) { _, newValue in
+                        Settings.thumbnailsEnabled = newValue
+                        if newValue {
+                            if !CGPreflightScreenCaptureAccess() {
+                                CGRequestScreenCaptureAccess()
+                            }
+                        } else {
+                            ThumbnailStore.shared.clear()
+                        }
+                    }
+            } footer: {
+                Text("Captures the visible tab only (requires Screen Recording), so thumbnails build up as you visit tabs.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 440, height: 340)
     }
 
-    @objc private func toggleLogin(_ sender: NSButton) {
+    private func setLogin(_ on: Bool) {
         do {
-            if sender.state == .on {
+            if on {
                 try SMAppService.mainApp.register()
             } else {
                 try SMAppService.mainApp.unregister()
@@ -78,22 +88,23 @@ final class SettingsWindowController: NSWindowController {
             alert.messageText = "Couldn't update login item"
             alert.informativeText = error.localizedDescription
             alert.runModal()
-            sender.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
+            launchAtLogin = (SMAppService.mainApp.status == .enabled)
         }
     }
+}
 
-    @objc private func toggleNumberShortcuts(_ sender: NSButton) {
-        Settings.numberShortcutsEnabled = (sender.state == .on)
-    }
-
-    @objc private func toggleThumbnails(_ sender: NSButton) {
-        let on = (sender.state == .on)
-        Settings.thumbnailsEnabled = on
-        if on && !CGPreflightScreenCaptureAccess() {
-            CGRequestScreenCaptureAccess()
-        }
-        if !on {
-            ThumbnailStore.shared.clear()
-        }
+final class SettingsWindowController: NSWindowController {
+    convenience init() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 340),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Safari MRU"
+        window.isReleasedWhenClosed = false
+        window.contentViewController = NSHostingController(rootView: SettingsView())
+        self.init(window: window)
+        window.center()
     }
 }
