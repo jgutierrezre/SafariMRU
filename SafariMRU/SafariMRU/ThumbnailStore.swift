@@ -24,9 +24,16 @@ final class ThumbnailStore: @unchecked Sendable {
     func start() {
         let t = DispatchSource.makeTimerSource(queue: .main)
         t.schedule(deadline: .now() + interval, repeating: interval)
-        t.setEventHandler { [weak self] in self?.tick() }
+        t.setEventHandler { [weak self] in self?.performCaptureIfAllowed() }
         t.resume()
         timer = t
+    }
+
+    /// Request a capture after a short debounce (e.g. after a tab becomes active).
+    func requestCapture(after delay: TimeInterval = 0.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.performCaptureIfAllowed()
+        }
     }
 
     func image(for title: String) -> NSImage? {
@@ -45,7 +52,7 @@ final class ThumbnailStore: @unchecked Sendable {
         CGPreflightScreenCaptureAccess()
     }
 
-    private func tick() {
+    private func performCaptureIfAllowed() {
         guard !capturing else { return }
         guard Settings.thumbnailsEnabled, CGPreflightScreenCaptureAccess() else { return }
         guard !PreviewWindowController.shared.isVisible else { return }

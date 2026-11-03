@@ -63,6 +63,7 @@ final class MRUSwitcher {
             SafariAX.switchToTab(title: target.title, fallbackIndex: target.index)
             MRUTracker.shared.promote(target.title)
             PreviewWindowController.shared.hide()
+            ThumbnailStore.shared.requestCapture(after: 0.4)
         }
     }
 
@@ -83,6 +84,7 @@ final class MRUSwitcher {
             SafariAX.switchToTab(title: target.title, fallbackIndex: target.index)
             MRUTracker.shared.promote(target.title)
             PreviewWindowController.shared.hide()
+            ThumbnailStore.shared.requestCapture(after: 0.4)
         }
     }
 
@@ -122,6 +124,7 @@ final class MRUSwitcher {
                 MRUTracker.shared.promote(tabs[idx].title)
             }
             PreviewWindowController.shared.hide()
+            ThumbnailStore.shared.requestCapture(after: 0.4)
         }
     }
 
