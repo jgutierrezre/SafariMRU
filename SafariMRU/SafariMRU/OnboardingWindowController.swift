@@ -81,7 +81,7 @@ struct OnboardingView: View {
                 PermissionRow(
                     title: "Screen Recording",
                     runs: "For thumbnails",
-                    detail: "Captures the visible tab for previews. Restart the app after granting.",
+                    detail: "Captures the visible tab for previews. If Safari MRU is not listed there, add it with “+”, then restart the app.",
                     granted: model.screenRecordingGranted,
                     isRequired: false,
                     action: Onboarding.openScreenRecordingSettings
