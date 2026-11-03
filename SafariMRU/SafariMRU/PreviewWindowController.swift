@@ -168,8 +168,14 @@ final class PreviewView: NSView {
         if let thumb = ThumbnailStore.shared.image(for: tab.title) {
             NSGraphicsContext.saveGraphicsState()
             NSBezierPath(roundedRect: thumbRect, xRadius: 6, yRadius: 6).addClip()
-            let source = Self.aspectFillSource(imageSize: thumb.size, target: thumbRect.size)
-            thumb.draw(in: thumbRect, from: source, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
+            // Aspect-fill: scale to cover the thumbnail area, then clip the overflow.
+            let iw = max(1, thumb.size.width)
+            let ih = max(1, thumb.size.height)
+            let scale = max(thumbRect.width / iw, thumbRect.height / ih)
+            let dw = iw * scale
+            let dh = ih * scale
+            let dest = NSRect(x: thumbRect.midX - dw / 2, y: thumbRect.midY - dh / 2, width: dw, height: dh)
+            thumb.draw(in: dest, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
             NSGraphicsContext.restoreGraphicsState()
         } else if let favicon = favicons[tab.title] {
             let s: CGFloat = 44
@@ -229,21 +235,6 @@ final class PreviewView: NSView {
             .paragraphStyle: paragraph,
         ]
         (title as NSString).draw(in: rect, withAttributes: attrs)
-    }
-
-    private static func aspectFillSource(imageSize: NSSize, target: NSSize) -> NSRect {
-        guard imageSize.width > 0, imageSize.height > 0, target.width > 0, target.height > 0 else {
-            return NSRect(origin: .zero, size: imageSize)
-        }
-        let targetAspect = target.width / target.height
-        let imageAspect = imageSize.width / imageSize.height
-        if imageAspect > targetAspect {
-            let w = imageSize.height * targetAspect
-            return NSRect(x: (imageSize.width - w) / 2, y: 0, width: w, height: imageSize.height)
-        } else {
-            let h = imageSize.width / targetAspect
-            return NSRect(x: 0, y: (imageSize.height - h) / 2, width: imageSize.width, height: h)
-        }
     }
 
     private func loadMissingFavicons() {
