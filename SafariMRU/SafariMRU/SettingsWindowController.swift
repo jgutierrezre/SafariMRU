@@ -38,14 +38,14 @@ struct SettingsView: View {
         Form {
             Section {
                 Toggle("Launch at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, newValue in
+                    .onChange(of: launchAtLogin) { newValue in
                         setLogin(newValue)
                     }
             }
 
             Section {
                 Toggle("Enable Ctrl+1–9 tab shortcuts", isOn: $numberShortcuts)
-                    .onChange(of: numberShortcuts) { _, newValue in
+                    .onChange(of: numberShortcuts) { newValue in
                         Settings.numberShortcutsEnabled = newValue
                     }
             } footer: {
@@ -56,7 +56,7 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Show tab thumbnails", isOn: $thumbnails)
-                    .onChange(of: thumbnails) { _, newValue in
+                    .onChange(of: thumbnails) { newValue in
                         Settings.thumbnailsEnabled = newValue
                         if newValue {
                             if !CGPreflightScreenCaptureAccess() {

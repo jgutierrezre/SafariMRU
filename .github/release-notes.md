@@ -21,4 +21,4 @@ A native, most-recently-used tab switcher for Safari.
 | `Esc` | Cancel |
 | Click a card | Switch immediately |
 
-Requires macOS 27 on Apple Silicon.
+Requires macOS 13 Ventura or later on Apple Silicon. Thumbnails use `SCScreenshotManager` on macOS 14+ and an `SCStream` fallback on macOS 13.

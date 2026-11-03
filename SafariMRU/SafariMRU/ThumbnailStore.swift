@@ -10,6 +10,7 @@
 
 import Cocoa
 import CoreGraphics
+import CoreImage
 import ScreenCaptureKit
 
 final class ThumbnailStore: @unchecked Sendable {
@@ -112,7 +113,21 @@ final class ThumbnailStore: @unchecked Sendable {
                     height: visible.height
                 )
 
-                let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                // SCScreenshotManager is macOS 14+; fall back to a one-frame
+                // SCStream capture on Ventura.
+                let image: CGImage
+                if #available(macOS 14.0, *) {
+                    image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                } else {
+                    // The stream path does not reliably honour sourceRect, so
+                    // take the whole display and crop the page area ourselves.
+                    let fullConfig = SCStreamConfiguration()
+                    fullConfig.showsCursor = false
+                    fullConfig.width = display.width
+                    fullConfig.height = display.height
+                    let full = try await Self.captureSingleFrame(filter: filter, configuration: fullConfig)
+                    image = Self.crop(full, displayFrame: display.frame, to: visible) ?? full
+                }
                 let final = Self.downscale(image, maxWidth: 320) ?? image
                 let nsImage = NSImage(cgImage: final, size: NSSize(width: final.width, height: final.height))
 
@@ -124,6 +139,79 @@ final class ThumbnailStore: @unchecked Sendable {
             } catch {
                 self.finishCapture()
             }
+        }
+    }
+
+    /// One-shot capture for macOS 13, where `SCScreenshotManager` is not
+    /// available: start an `SCStream`, grab the first frame, stop it again.
+    @available(macOS 12.3, *)
+    private static func captureSingleFrame(
+        filter: SCContentFilter,
+        configuration: SCStreamConfiguration
+    ) async throws -> CGImage {
+        let stream = SCStream(filter: filter, configuration: configuration, delegate: nil)
+        let box = FrameBox()
+        try stream.addStreamOutput(box, type: .screen, sampleHandlerQueue: box.queue)
+        try await stream.startCapture()
+
+        // Give the stream up to ~1 s to deliver a frame.
+        for _ in 0..<100 {
+            if let image = box.captured {
+                try? await stream.stopCapture()
+                return image
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        try? await stream.stopCapture()
+        throw CaptureError.noFrame
+    }
+
+    private enum CaptureError: Error {
+        case noFrame
+    }
+
+    /// Crop a full-display frame down to `visible` (both in display points).
+    private static func crop(_ image: CGImage, displayFrame: CGRect, to visible: CGRect) -> CGImage? {
+        let scale = CGFloat(image.width) / max(1, displayFrame.width)
+        let rect = CGRect(
+            x: (visible.minX - displayFrame.minX) * scale,
+            y: (visible.minY - displayFrame.minY) * scale,
+            width: visible.width * scale,
+            height: visible.height * scale
+        ).integral
+        return image.cropping(to: rect)
+    }
+
+    /// Collects the first frames a stream delivers.
+    @available(macOS 12.3, *)
+    private final class FrameBox: NSObject, SCStreamOutput, @unchecked Sendable {
+        let queue = DispatchQueue(label: "com.jgutierrezre.SafariMRU.frames")
+        private let lock = NSLock()
+        private let context = CIContext()
+        private var image: CGImage?
+
+        var captured: CGImage? {
+            lock.lock()
+            defer { lock.unlock() }
+            return image
+        }
+
+        func stream(
+            _ stream: SCStream,
+            didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
+            of type: SCStreamOutputType
+        ) {
+            guard type == .screen else { return }
+            lock.lock()
+            let haveImage = image != nil
+            lock.unlock()
+            guard !haveImage, let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+            let ci = CIImage(cvPixelBuffer: buffer)
+            guard let frame = context.createCGImage(ci, from: ci.extent) else { return }
+            lock.lock()
+            image = frame
+            lock.unlock()
         }
     }
 

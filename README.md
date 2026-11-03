@@ -15,7 +15,7 @@ Unlike browser extensions, Safari MRU is fully native: it reads Safari's real ta
 
 ## Requirements
 
-- macOS 27 or later (Apple Silicon)
+- macOS 13 Ventura or later (Apple Silicon; tested on macOS 27)
 - **Accessibility** permission (required — used to read Safari's tabs and to intercept the shortcuts)
 - **Screen Recording** permission (optional — only for thumbnails)
 
