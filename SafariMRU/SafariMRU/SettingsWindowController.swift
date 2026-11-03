@@ -73,7 +73,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: 340)
+        .frame(width: 440, height: 300)
     }
 
     private func setLogin(_ on: Bool) {
@@ -96,7 +96,7 @@ struct SettingsView: View {
 final class SettingsWindowController: NSWindowController {
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 340),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 300),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
