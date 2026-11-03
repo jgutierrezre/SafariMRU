@@ -16,7 +16,7 @@ jobs:
   release:
     runs-on: xcode-27
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -36,7 +36,7 @@ jobs:
           Scripts/build-release.sh "${{ steps.v.outputs.version }}" | tail -40
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: SafariMRU-${{ steps.v.outputs.version }}
           path: dist/*.zip
