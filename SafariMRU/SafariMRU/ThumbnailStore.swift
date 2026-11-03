@@ -1,0 +1,109 @@
+//
+//  ThumbnailStore.swift
+//  SafariMRU
+//
+//  Captures a preview of the visible Safari tab (the only tab Safari renders)
+//  via ScreenCaptureKit, cropping to the web-content area, and caches it per
+//  tab title. Requires Screen Recording permission.
+//
+
+import Cocoa
+import CoreGraphics
+import ScreenCaptureKit
+
+final class ThumbnailStore {
+    static let shared = ThumbnailStore()
+
+    private let lock = NSLock()
+    private var cache: [String: NSImage] = [:]
+
+    func image(for title: String) -> NSImage? {
+        lock.lock()
+        defer { lock.unlock() }
+        return cache[title]
+    }
+
+    func clear() {
+        lock.lock()
+        cache.removeAll()
+        lock.unlock()
+    }
+
+    func hasScreenRecordingPermission() -> Bool {
+        CGPreflightScreenCaptureAccess()
+    }
+
+    /// Schedule a capture of the currently-visible tab, cached under `title`.
+    func captureActiveTab(title: String) {
+        guard Settings.thumbnailsEnabled else { return }
+        guard CGPreflightScreenCaptureAccess() else { return }
+
+        // Give the tab a moment to render, then capture the focused web area.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self = self else { return }
+            guard let frame = SafariAX.webContentFrame(), frame.width > 20, frame.height > 20 else { return }
+            self.capture(webRect: frame, title: title)
+        }
+    }
+
+    private func capture(webRect: CGRect, title: String) {
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self = self else { return }
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+                let center = CGPoint(x: webRect.midX, y: webRect.midY)
+                guard let display = content.displays.first(where: { $0.frame.contains(center) }) ?? content.displays.first else {
+                    return
+                }
+
+                let filter = SCContentFilter(display: display, excludingWindows: [])
+                let config = SCStreamConfiguration()
+                config.showsCursor = false
+                // Size output to the web area only.
+                let scale = CGFloat(display.width) / max(1, display.frame.width)
+                config.width = max(1, Int(webRect.width * scale))
+                config.height = max(1, Int(webRect.height * scale))
+                config.sourceRect = CGRect(
+                    x: webRect.minX - display.frame.minX,
+                    y: webRect.minY - display.frame.minY,
+                    width: webRect.width,
+                    height: webRect.height
+                )
+
+                let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                let final = Self.downscale(image, maxWidth: 320) ?? image
+                let nsImage = NSImage(cgImage: final, size: NSSize(width: final.width, height: final.height))
+
+                self.store(nsImage, for: title)
+            } catch {
+                // Permission not granted or capture failed; skip.
+            }
+        }
+    }
+
+    private func store(_ image: NSImage, for title: String) {
+        lock.lock()
+        cache[title] = image
+        lock.unlock()
+    }
+
+    private static func downscale(_ cg: CGImage, maxWidth: Int) -> CGImage? {
+        if cg.width <= maxWidth { return cg }
+        let scale = Double(maxWidth) / Double(cg.width)
+        let w = maxWidth
+        let h = max(1, Int(Double(cg.height) * scale))
+        guard let ctx = CGContext(
+            data: nil,
+            width: w,
+            height: h,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        ctx.interpolationQuality = .medium
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()
+    }
+}

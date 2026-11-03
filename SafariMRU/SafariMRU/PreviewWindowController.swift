@@ -2,9 +2,9 @@
 //  PreviewWindowController.swift
 //  SafariMRU
 //
-//  A borderless, non-activating overlay that shows tab previews (index, favicon
-//  and title) while cycling, with the current selection highlighted. Cards wrap
-//  into a grid that is clamped to the screen so it never overflows.
+//  Borderless overlay showing tab previews while cycling. Cards wrap into a
+//  screen-clamped grid. With thumbnails enabled, each card shows a captured
+//  page preview; otherwise a compact favicon + title layout.
 //
 
 import Cocoa
@@ -56,8 +56,10 @@ final class PreviewWindowController {
     }
 
     func show(tabs: [TabPreview], selected: Int) {
-        let layout = Self.computeLayout(count: tabs.count)
+        let thumbnails = Settings.thumbnailsEnabled
+        let layout = Self.computeLayout(count: tabs.count, thumbnails: thumbnails)
         previewView.layout = layout
+        previewView.showThumbnails = thumbnails
         previewView.tabs = tabs
         previewView.selectedIndex = selected
         previewView.needsDisplay = true
@@ -79,9 +81,7 @@ final class PreviewWindowController {
         panel.orderOut(nil)
     }
 
-    /// Compute a grid that fits within 92% of the screen, shrinking cards only
-    /// when there are too many tabs to fit even at the minimum size.
-    private static func computeLayout(count: Int) -> PreviewLayout {
+    private static func computeLayout(count: Int, thumbnails: Bool) -> PreviewLayout {
         let screen = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
             ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let maxW = screen.width * 0.92
@@ -89,25 +89,25 @@ final class PreviewWindowController {
 
         let gap: CGFloat = 10
         let margin: CGFloat = 16
-        var cardW: CGFloat = 200
-        var cardH: CGFloat = 56
+        var cardW: CGFloat = thumbnails ? 180 : 200
+        var cardH: CGFloat = thumbnails ? 150 : 56
 
         while true {
             let cols = max(1, min(count, Int((maxW - 2 * margin + gap) / (cardW + gap))))
             let layout = PreviewLayout(columns: cols, cardWidth: cardW, cardHeight: cardH, gap: gap, margin: margin)
             let fits = layout.width(for: count) <= maxW && layout.height(for: count) <= maxH
-            if fits || (cardW <= 150 && cardH <= 44) {
+            if fits || (cardW <= 130 && cardH <= 60) {
                 return layout
             }
-            cardW = max(150, cardW * 0.9)
-            cardH = max(44, cardH * 0.9)
+            cardW = max(130, cardW * 0.9)
+            cardH = max(60, cardH * 0.9)
         }
     }
 }
 
 final class PreviewView: NSView {
     var layout = PreviewLayout(columns: 1, cardWidth: 200, cardHeight: 56, gap: 10, margin: 16)
-
+    var showThumbnails = false
     var tabs: [TabPreview] = [] {
         didSet {
             needsDisplay = true
@@ -155,16 +155,46 @@ final class PreviewView: NSView {
         (selected ? NSColor.controlAccentColor : NSColor.white.withAlphaComponent(0.3)).setStroke()
         border.stroke()
 
-        // Index label (left)
-        let indexAttrs: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor.white.withAlphaComponent(0.55),
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
-        ]
-        let indexStr = "\(index + 1)" as NSString
-        let indexSize = indexStr.size(withAttributes: indexAttrs)
-        indexStr.draw(at: NSPoint(x: rect.minX + 10, y: rect.midY - indexSize.height / 2), withAttributes: indexAttrs)
+        if showThumbnails {
+            drawThumbnailCard(tab, index: index, in: rect)
+        } else {
+            drawCompactCard(tab, index: index, in: rect)
+        }
+    }
 
-        // Favicon
+    private func drawThumbnailCard(_ tab: TabPreview, index: Int, in rect: NSRect) {
+        let thumbRect = NSRect(x: rect.minX + 6, y: rect.minY + 6, width: rect.width - 12, height: rect.height - 42)
+
+        if let thumb = ThumbnailStore.shared.image(for: tab.title) {
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(roundedRect: thumbRect, xRadius: 6, yRadius: 6).addClip()
+            thumb.draw(in: thumbRect, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
+            NSGraphicsContext.restoreGraphicsState()
+        } else if let favicon = favicons[tab.title] {
+            let s: CGFloat = 44
+            let r = NSRect(x: thumbRect.midX - s / 2, y: thumbRect.midY - s / 2, width: s, height: s)
+            favicon.draw(in: r, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
+        } else {
+            NSColor.white.withAlphaComponent(0.08).setFill()
+            NSBezierPath(roundedRect: thumbRect, xRadius: 6, yRadius: 6).fill()
+        }
+
+        // Bottom row: index + favicon + title
+        let rowY = rect.maxY - 30
+        drawIndex(index, x: rect.minX + 10, centerY: rowY + 12)
+
+        let faviconSize: CGFloat = 16
+        let faviconRect = NSRect(x: rect.minX + 24, y: rowY + 4, width: faviconSize, height: faviconSize)
+        if let favicon = favicons[tab.title] {
+            favicon.draw(in: faviconRect, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
+        }
+
+        drawTitle(tab, x: rect.minX + 46, y: rowY + 2, width: rect.width - 54)
+    }
+
+    private func drawCompactCard(_ tab: TabPreview, index: Int, in rect: NSRect) {
+        drawIndex(index, x: rect.minX + 10, centerY: rect.midY)
+
         let faviconSize = min(26, rect.height - 16)
         let faviconRect = NSRect(x: rect.minX + 30, y: rect.midY - faviconSize / 2, width: faviconSize, height: faviconSize)
         if let favicon = favicons[tab.title] {
@@ -174,17 +204,30 @@ final class PreviewView: NSView {
             NSBezierPath(roundedRect: faviconRect, xRadius: 6, yRadius: 6).fill()
         }
 
-        // Title
+        drawTitle(tab, x: rect.minX + 64, y: rect.minY + (rect.height - 18) / 2, width: rect.width - 72)
+    }
+
+    private func drawIndex(_ index: Int, x: CGFloat, centerY: CGFloat) {
+        let attrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor.white.withAlphaComponent(0.55),
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
+        ]
+        let str = "\(index + 1)" as NSString
+        let size = str.size(withAttributes: attrs)
+        str.draw(at: NSPoint(x: x, y: centerY - size.height / 2), withAttributes: attrs)
+    }
+
+    private func drawTitle(_ tab: TabPreview, x: CGFloat, y: CGFloat, width: CGFloat) {
         let title = tab.title.isEmpty ? tab.url : tab.title
-        let titleRect = NSRect(x: rect.minX + 64, y: rect.minY + (rect.height - 18) / 2, width: rect.width - 72, height: 20)
+        let rect = NSRect(x: x, y: y, width: width, height: 20)
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byTruncatingTail
         let attrs: [NSAttributedString.Key: Any] = [
             .foregroundColor: NSColor.white,
-            .font: NSFont.systemFont(ofSize: 13, weight: .medium),
+            .font: NSFont.systemFont(ofSize: 12, weight: .medium),
             .paragraphStyle: paragraph,
         ]
-        (title as NSString).draw(in: titleRect, withAttributes: attrs)
+        (title as NSString).draw(in: rect, withAttributes: attrs)
     }
 
     private func loadMissingFavicons() {

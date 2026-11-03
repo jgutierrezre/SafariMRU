@@ -119,6 +119,38 @@ final class SafariAX {
         AXUIElementPerformAction(last, kAXPressAction as CFString)
     }
 
+    /// Screen rectangle of the focused window's web content (for thumbnails).
+    static func webContentFrame() -> CGRect? {
+        guard let win = focusedWindow() else { return nil }
+        return findWebAreaFrame(win, depth: 0)
+    }
+
+    private static func findWebAreaFrame(_ el: AXUIElement, depth: Int) -> CGRect? {
+        if depth > 12 { return nil }
+        if strAttr(el, kAXRoleAttribute) == "AXWebArea" {
+            return frameOf(el)
+        }
+        if let children = attr(el, kAXChildrenAttribute) as? [AXUIElement] {
+            for c in children {
+                if let f = findWebAreaFrame(c, depth: depth + 1) { return f }
+            }
+        }
+        return nil
+    }
+
+    private static func frameOf(_ el: AXUIElement) -> CGRect? {
+        var posV: CFTypeRef?
+        var sizeV: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(el, kAXPositionAttribute as CFString, &posV) == .success,
+              AXUIElementCopyAttributeValue(el, kAXSizeAttribute as CFString, &sizeV) == .success,
+              let posRaw = posV, let sizeRaw = sizeV else { return nil }
+        var point = CGPoint.zero
+        var size = CGSize.zero
+        guard AXValueGetValue(unsafeBitCast(posRaw, to: AXValue.self), .cgPoint, &point),
+              AXValueGetValue(unsafeBitCast(sizeRaw, to: AXValue.self), .cgSize, &size) else { return nil }
+        return CGRect(origin: point, size: size)
+    }
+
     /// Returns a title -> favicon image data map by walking the tab bar once.
     static func faviconDataByTitle() -> [String: Data] {
         var result: [String: Data] = [:]

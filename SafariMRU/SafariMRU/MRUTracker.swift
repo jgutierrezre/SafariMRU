@@ -82,12 +82,18 @@ final class MRUTracker {
         for t in titles where !mru.contains(t) { mru.append(t) }
 
         let a = titles[active]
+        var changed = false
         if a != lastActive {
             mru.removeAll { $0 == a }
             mru.insert(a, at: 0)
             lastActive = a
+            changed = true
         }
         lock.unlock()
+
+        if changed {
+            ThumbnailStore.shared.captureActiveTab(title: a)
+        }
     }
 
     private func ensureObserver() {

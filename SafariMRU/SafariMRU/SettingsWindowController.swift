@@ -2,26 +2,34 @@
 //  SettingsWindowController.swift
 //  SafariMRU
 //
-//  Settings window: launch-at-login toggle and Ctrl+number shortcut toggle.
+//  Settings window: launch-at-login, Ctrl+number shortcuts, tab thumbnails.
 //
 
 import Cocoa
+import CoreGraphics
 import ServiceManagement
 
 enum Settings {
     private static let numberShortcutsKey = "enableNumberShortcuts"
+    private static let thumbnailsKey = "enableThumbnails"
 
     /// Whether Ctrl+1…9 / Ctrl+0 jump to tabs. Defaults to true.
     static var numberShortcutsEnabled: Bool {
         get { (UserDefaults.standard.object(forKey: numberShortcutsKey) as? Bool) ?? true }
         set { UserDefaults.standard.set(newValue, forKey: numberShortcutsKey) }
     }
+
+    /// Whether tab thumbnails are captured. Defaults to false (needs Screen Recording).
+    static var thumbnailsEnabled: Bool {
+        get { (UserDefaults.standard.object(forKey: thumbnailsKey) as? Bool) ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: thumbnailsKey) }
+    }
 }
 
 final class SettingsWindowController: NSWindowController {
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: 180),
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 210),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -30,20 +38,25 @@ final class SettingsWindowController: NSWindowController {
         window.isReleasedWhenClosed = false
         self.init(window: window)
 
-        let content = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 180))
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 210))
 
         let loginCheckbox = NSButton(checkboxWithTitle: "Launch at login", target: self, action: #selector(toggleLogin(_:)))
-        loginCheckbox.frame = NSRect(x: 20, y: 140, width: 280, height: 22)
+        loginCheckbox.frame = NSRect(x: 20, y: 172, width: 300, height: 22)
         loginCheckbox.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
         content.addSubview(loginCheckbox)
 
         let numberCheckbox = NSButton(checkboxWithTitle: "Enable Ctrl+1–9 tab shortcuts", target: self, action: #selector(toggleNumberShortcuts(_:)))
-        numberCheckbox.frame = NSRect(x: 20, y: 110, width: 300, height: 22)
+        numberCheckbox.frame = NSRect(x: 20, y: 144, width: 320, height: 22)
         numberCheckbox.state = Settings.numberShortcutsEnabled ? .on : .off
         content.addSubview(numberCheckbox)
 
-        let note = NSTextField(labelWithString: "Ctrl+1–9 jumps to a tab (MRU order during a cycle, tab-bar order otherwise). Turn this off if it conflicts with Mission Control space switching.")
-        note.frame = NSRect(x: 20, y: 40, width: 300, height: 60)
+        let thumbsCheckbox = NSButton(checkboxWithTitle: "Show tab thumbnails (requires Screen Recording)", target: self, action: #selector(toggleThumbnails(_:)))
+        thumbsCheckbox.frame = NSRect(x: 20, y: 116, width: 320, height: 22)
+        thumbsCheckbox.state = Settings.thumbnailsEnabled ? .on : .off
+        content.addSubview(thumbsCheckbox)
+
+        let note = NSTextField(labelWithString: "Ctrl+1–9 jumps to a tab (MRU order during a cycle, tab-bar order otherwise). Thumbnails capture the visible tab only, so they build up as you visit tabs.")
+        note.frame = NSRect(x: 20, y: 40, width: 320, height: 66)
         note.lineBreakMode = .byWordWrapping
         note.textColor = .secondaryLabelColor
         note.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -71,5 +84,16 @@ final class SettingsWindowController: NSWindowController {
 
     @objc private func toggleNumberShortcuts(_ sender: NSButton) {
         Settings.numberShortcutsEnabled = (sender.state == .on)
+    }
+
+    @objc private func toggleThumbnails(_ sender: NSButton) {
+        let on = (sender.state == .on)
+        Settings.thumbnailsEnabled = on
+        if on && !CGPreflightScreenCaptureAccess() {
+            CGRequestScreenCaptureAccess()
+        }
+        if !on {
+            ThumbnailStore.shared.clear()
+        }
     }
 }

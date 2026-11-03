@@ -23,6 +23,7 @@
         { "path": "SafariAX.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "SettingsWindowController.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "ShortcutInterceptor.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
+        { "path": "ThumbnailStore.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "main.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "Assets.xcassets", "target-membership": [ "SafariMRU/resources" ] },
         { "path": "Info.plist" },
