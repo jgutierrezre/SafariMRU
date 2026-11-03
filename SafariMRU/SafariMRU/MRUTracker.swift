@@ -106,7 +106,7 @@ final class MRUTracker {
         if changed {
             // Debounced live-cache: capture shortly after the tab becomes active
             // (only runs if the preview is closed at that moment).
-            ThumbnailStore.shared.requestCapture(after: 0.5)
+            ThumbnailStore.shared.captureAfterActivation()
         }
     }
 

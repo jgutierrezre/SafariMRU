@@ -36,6 +36,13 @@ final class ThumbnailStore: @unchecked Sendable {
         }
     }
 
+    /// Capture right away when a tab becomes active, then again once it has
+    /// settled (catches late paints). Both skip if the preview is open.
+    func captureAfterActivation() {
+        requestCapture(after: 0.05)
+        requestCapture(after: 0.5)
+    }
+
     func image(for title: String) -> NSImage? {
         lock.lock()
         defer { lock.unlock() }
