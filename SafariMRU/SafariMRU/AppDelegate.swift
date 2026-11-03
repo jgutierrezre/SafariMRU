@@ -31,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         item.menu = menu
 
         ShortcutInterceptor.shared.start()
+        _ = PreviewWindowController.shared // create the panel on the main thread
         MRUTracker.shared.start()
     }
 

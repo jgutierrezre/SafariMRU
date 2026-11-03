@@ -48,6 +48,10 @@ final class ThumbnailStore {
     }
 
     private func capture(webRect: CGRect, title: String) {
+        // Read the preview window id on the calling (main) thread — creating the
+        // NSPanel off the main thread would crash.
+        let previewWindowID = PreviewWindowController.shared.windowNumber
+
         Task.detached(priority: .utility) { [weak self] in
             guard let self = self else { return }
             do {
@@ -64,7 +68,6 @@ final class ThumbnailStore {
                 guard visible.width > 20, visible.height > 20 else { return }
 
                 // Exclude our own preview overlay so it never appears in a thumbnail.
-                let previewWindowID = PreviewWindowController.shared.windowNumber
                 let excluding = content.windows.filter { Int($0.windowID) == previewWindowID }
                 let filter = SCContentFilter(display: display, excludingWindows: excluding)
 
