@@ -32,6 +32,12 @@ final class MRUSwitcher {
             cycleTabs = tabs
             isCycling = true
             selection = 0
+
+            // Capture the current tab the moment the cycle begins. The preview
+            // overlay is excluded from the capture, so it never appears in it.
+            if let title = MRUTracker.shared.currentActiveTitle {
+                ThumbnailStore.shared.captureActiveTab(title: title, delay: 0)
+            }
         }
 
         guard cycleTabs.count > 1 else { return }
@@ -46,6 +52,25 @@ final class MRUSwitcher {
 
         // Deferred: only move the highlight; the switch happens on Control release.
         updatePreview()
+    }
+
+    /// Switch immediately to the Nth item of the active cycle (from a click).
+    func commitToIndex(_ index: Int) {
+        queue.async { self.doCommitToIndex(index) }
+    }
+
+    private func doCommitToIndex(_ index: Int) {
+        guard isCycling, index >= 0, index < cycleTabs.count else { return }
+        let target = cycleTabs[index]
+        isCycling = false
+        cycleTabs = []
+        selection = 0
+        DispatchQueue.main.async {
+            SafariAX.switchToTab(title: target.title, fallbackIndex: target.index)
+            MRUTracker.shared.promote(target.title)
+            ThumbnailStore.shared.captureActiveTab(title: target.title)
+            PreviewWindowController.shared.hide()
+        }
     }
 
     /// Jump to a numbered position in the active cycle (immediate): 1...n, or 0 for the last.

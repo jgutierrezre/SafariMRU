@@ -4,7 +4,7 @@
 //
 //  Borderless overlay showing tab previews while cycling. Cards wrap into a
 //  screen-clamped grid. With thumbnails enabled, each card shows a captured
-//  page preview; otherwise a compact favicon + title layout.
+//  page preview; otherwise a compact favicon + title layout. Cards are clickable.
 //
 
 import Cocoa
@@ -40,6 +40,8 @@ final class PreviewWindowController {
     private let panel: NSPanel
     private let previewView = PreviewView()
 
+    var windowNumber: Int { panel.windowNumber }
+
     init() {
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 88),
@@ -53,6 +55,10 @@ final class PreviewWindowController {
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = previewView
+
+        previewView.onCardClicked = { index in
+            MRUSwitcher.shared.commitToIndex(index)
+        }
     }
 
     func show(tabs: [TabPreview], selected: Int) {
@@ -116,9 +122,22 @@ final class PreviewView: NSView {
     }
     var selectedIndex = 0
 
+    var onCardClicked: ((Int) -> Void)?
+
     private var favicons: [String: NSImage] = [:]
+    private var cardRects: [(index: Int, rect: NSRect)] = []
 
     override var isFlipped: Bool { true }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        for (index, rect) in cardRects where rect.contains(point) {
+            onCardClicked?(index)
+            return
+        }
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -130,6 +149,8 @@ final class PreviewView: NSView {
         let startX = (bounds.width - totalW) / 2
         let startY = (bounds.height - totalH) / 2
 
+        cardRects.removeAll()
+
         for (i, tab) in tabs.enumerated() {
             let row = i / cols
             let col = i % cols
@@ -139,6 +160,7 @@ final class PreviewView: NSView {
                 width: layout.cardWidth,
                 height: layout.cardHeight
             )
+            cardRects.append((index: i, rect: rect))
             drawCard(tab, index: i, in: rect)
         }
     }
@@ -188,22 +210,27 @@ final class PreviewView: NSView {
 
         // Bottom row: index + favicon + title
         let rowY = rect.maxY - 30
-        drawIndex(index, x: rect.minX + 10, centerY: rowY + 12)
+        let indexX = rect.minX + 10
+        let indexW = drawIndex(index, x: indexX, centerY: rowY + 12)
 
         let faviconSize: CGFloat = 16
-        let faviconRect = NSRect(x: rect.minX + 24, y: rowY + 4, width: faviconSize, height: faviconSize)
+        let faviconX = indexX + indexW + 8
+        let faviconRect = NSRect(x: faviconX, y: rowY + 4, width: faviconSize, height: faviconSize)
         if let favicon = favicons[tab.title] {
             favicon.draw(in: faviconRect, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
         }
 
-        drawTitle(tab, x: rect.minX + 46, y: rowY + 2, width: rect.width - 54)
+        let titleX = faviconX + faviconSize + 6
+        drawTitle(tab, x: titleX, y: rowY + 2, width: rect.maxX - 8 - titleX)
     }
 
     private func drawCompactCard(_ tab: TabPreview, index: Int, in rect: NSRect) {
-        drawIndex(index, x: rect.minX + 10, centerY: rect.midY)
+        let indexX = rect.minX + 10
+        let indexW = drawIndex(index, x: indexX, centerY: rect.midY)
 
         let faviconSize = min(26, rect.height - 16)
-        let faviconRect = NSRect(x: rect.minX + 30, y: rect.midY - faviconSize / 2, width: faviconSize, height: faviconSize)
+        let faviconX = indexX + indexW + 8
+        let faviconRect = NSRect(x: faviconX, y: rect.midY - faviconSize / 2, width: faviconSize, height: faviconSize)
         if let favicon = favicons[tab.title] {
             favicon.draw(in: faviconRect, from: .zero, operation: .sourceOver, fraction: 1.0, respectFlipped: true, hints: nil)
         } else {
@@ -211,10 +238,13 @@ final class PreviewView: NSView {
             NSBezierPath(roundedRect: faviconRect, xRadius: 6, yRadius: 6).fill()
         }
 
-        drawTitle(tab, x: rect.minX + 64, y: rect.minY + (rect.height - 18) / 2, width: rect.width - 72)
+        let titleX = faviconX + faviconSize + 6
+        drawTitle(tab, x: titleX, y: rect.minY + (rect.height - 18) / 2, width: rect.maxX - 8 - titleX)
     }
 
-    private func drawIndex(_ index: Int, x: CGFloat, centerY: CGFloat) {
+    /// Draw the index label; returns the width it occupied so callers can offset.
+    @discardableResult
+    private func drawIndex(_ index: Int, x: CGFloat, centerY: CGFloat) -> CGFloat {
         let attrs: [NSAttributedString.Key: Any] = [
             .foregroundColor: NSColor.white.withAlphaComponent(0.55),
             .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
@@ -222,11 +252,12 @@ final class PreviewView: NSView {
         let str = "\(index + 1)" as NSString
         let size = str.size(withAttributes: attrs)
         str.draw(at: NSPoint(x: x, y: centerY - size.height / 2), withAttributes: attrs)
+        return size.width
     }
 
     private func drawTitle(_ tab: TabPreview, x: CGFloat, y: CGFloat, width: CGFloat) {
         let title = tab.title.isEmpty ? tab.url : tab.title
-        let rect = NSRect(x: x, y: y, width: width, height: 20)
+        let rect = NSRect(x: x, y: y, width: max(10, width), height: 20)
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byTruncatingTail
         let attrs: [NSAttributedString.Key: Any] = [

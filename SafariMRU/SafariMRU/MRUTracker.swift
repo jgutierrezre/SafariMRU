@@ -69,6 +69,12 @@ final class MRUTracker {
         return currentTitles.count
     }
 
+    var currentActiveTitle: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastActive
+    }
+
     /// Move a title to the front of the MRU stack.
     func promote(_ title: String) {
         lock.lock()
