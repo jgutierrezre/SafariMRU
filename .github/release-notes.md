@@ -7,8 +7,8 @@ A native, most-recently-used tab switcher for Safari.
 3. This build is **signed with a self-signed certificate, not notarized**, so macOS blocks the first launch.
    Open **System Settings → Privacy & Security**, click **Open Anyway** for Safari MRU
    (or run `xattr -dr com.apple.quarantine /Applications/SafariMRU.app`).
-4. Launch it and grant **Accessibility** in **System Settings → Privacy & Security → Accessibility**.
-   No relaunch needed — the app retries until the permission is in place.
+4. Launch it. The welcome window shows live permission status and opens the right System Settings pane.
+   Grant **Accessibility** (required); no relaunch needed — the app retries until it is in place.
 5. Optional: menu bar icon → **Settings…** → **Show tab thumbnails**, then allow **Screen & System Audio Recording**. If Safari MRU is not listed, click **+** and add the app.
 
 ### Shortcuts

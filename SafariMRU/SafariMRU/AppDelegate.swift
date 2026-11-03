@@ -45,6 +45,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             timer.invalidate()
             self?.permissionTimer = nil
         }
+
+        // First run (or whenever Accessibility is missing): explain and verify
+        // the permissions. Delayed slightly so the system prompt comes first.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            OnboardingWindowController.shared.presentIfNeeded()
+        }
     }
 
     @objc private func openSettings() {

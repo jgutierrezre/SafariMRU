@@ -56,7 +56,8 @@ final class ThumbnailStore: @unchecked Sendable {
             guard let self = self,
                   Settings.thumbnailsEnabled,
                   !CGPreflightScreenCaptureAccess(),
-                  !self.warnedAboutScreenRecording else { return }
+                  !self.warnedAboutScreenRecording,
+                  !OnboardingWindowController.shared.isVisible else { return }
             self.warnedAboutScreenRecording = true
             self.showScreenRecordingAlert()
         }

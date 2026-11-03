@@ -19,6 +19,7 @@
         { "path": "DebugLog.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "MRUSwitcher.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "MRUTracker.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
+        { "path": "OnboardingWindowController.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "PreviewWindowController.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "SafariAX.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
         { "path": "SettingsWindowController.swift", "target-membership": [ "SafariMRU/compile-sources" ] },
