@@ -23,7 +23,7 @@ Unlike browser extensions, Safari MRU is fully native: it reads Safari's real ta
 
 1. Download `SafariMRU-<version>.zip` from [Releases](https://github.com/jgutierrezre/SafariMRU/releases) and unzip it.
 2. Move **SafariMRU.app** to `/Applications`.
-3. The build is **ad-hoc signed, not notarized** (there is no Apple Developer ID yet), so macOS will block the first launch. Either:
+3. The build is **signed with a self-signed certificate, not notarized** (there is no Apple Developer ID yet), so macOS will block the first launch. Either:
    - open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** for Safari MRU, or
    - clear the quarantine flag once:
      ```sh
@@ -32,7 +32,7 @@ Unlike browser extensions, Safari MRU is fully native: it reads Safari's real ta
 4. Launch the app. It asks for **Accessibility** access — approve it in **System Settings → Privacy & Security → Accessibility**. No relaunch is needed; the app retries every couple of seconds until the permission is granted.
 5. Optional: open **Settings…** from the menu-bar icon and enable **Show tab thumbnails**, then allow **Screen Recording** when prompted.
 
-> Because the app is ad-hoc signed, macOS may ask for Accessibility again after an update. Re-approve (or remove the old entry and re-add it).
+> The signing identity is stable, so **Accessibility and Screen Recording grants survive app updates**. They are only lost if you replace the app or remove the entry by hand.
 
 ## Usage
 
@@ -64,10 +64,11 @@ cd SafariMRU
 open SafariMRU/SafariMRU.xcodeproj   # build & run from Xcode
 ```
 
-Or produce a distributable, ad-hoc signed zip:
+Or produce a distributable zip (self-signed if the identity is in your keychain, otherwise ad-hoc):
 
 ```sh
-Scripts/build-release.sh 1.0.0    # -> dist/SafariMRU-1.0.0.zip
+Scripts/build-release.sh 1.0.0                              # ad-hoc
+SIGN_IDENTITY="SafariMRU Self-Signed" Scripts/build-release.sh 1.0.0   # stable identity
 ```
 
 Pushing a `v*` tag builds the zip on GitHub Actions and attaches it to a release:

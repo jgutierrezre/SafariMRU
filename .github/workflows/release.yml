@@ -30,6 +30,41 @@ jobs:
       - name: Show toolchain
         run: xcodebuild -version
 
+      # Signs with the project's stable self-signed identity so that users keep
+      # their Accessibility / Screen Recording grants across updates. Falls back
+      # to ad-hoc signing when the secrets are not configured.
+      - name: Import signing identity
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CERT_P12:-}" ]; then
+            echo "No signing certificate configured; building ad-hoc."
+            echo "SIGN_IDENTITY=-" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+
+          security create-keychain -p actions "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p actions "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions "$KEYCHAIN" >/dev/null
+
+          # A self-signed certificate must be trusted locally before codesign
+          # will accept it as an identity.
+          openssl pkcs12 -in "$RUNNER_TEMP/cert.p12" -clcerts -nokeys \
+            -out "$RUNNER_TEMP/cert.pem" -passin "pass:$CERT_PASSWORD"
+          security add-trusted-cert -r trustRoot -k "$KEYCHAIN" "$RUNNER_TEMP/cert.pem"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/cert.pem"
+          echo "SIGN_IDENTITY=SafariMRU Self-Signed" >> "$GITHUB_ENV"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
       - name: Build release zip
         run: |
           set -o pipefail

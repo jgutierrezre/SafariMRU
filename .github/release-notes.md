@@ -4,7 +4,7 @@ A native, most-recently-used tab switcher for Safari.
 
 1. Download the `SafariMRU-x.y.z.zip` below and unzip it.
 2. Move **SafariMRU.app** to `/Applications`.
-3. This build is **ad-hoc signed, not notarized**, so macOS blocks the first launch.
+3. This build is **signed with a self-signed certificate, not notarized**, so macOS blocks the first launch.
    Open **System Settings → Privacy & Security**, click **Open Anyway** for Safari MRU
    (or run `xattr -dr com.apple.quarantine /Applications/SafariMRU.app`).
 4. Launch it and grant **Accessibility** in **System Settings → Privacy & Security → Accessibility**.

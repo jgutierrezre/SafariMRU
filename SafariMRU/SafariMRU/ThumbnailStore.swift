@@ -28,6 +28,12 @@ final class ThumbnailStore: @unchecked Sendable {
         t.setEventHandler { [weak self] in self?.performCaptureIfAllowed() }
         t.resume()
         timer = t
+
+        // Thumbnails are already enabled but the grant was lost (e.g. the app
+        // was updated or the permission was removed). Ask again once per launch.
+        if Settings.thumbnailsEnabled && !CGPreflightScreenCaptureAccess() {
+            CGRequestScreenCaptureAccess()
+        }
     }
 
     /// Request a capture after a short debounce (e.g. after a tab becomes active).
