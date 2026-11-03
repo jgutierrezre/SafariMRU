@@ -11,12 +11,12 @@ import Cocoa
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var settingsWindow: SettingsWindowController?
+    private var permissionTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.autosaveName = "SafariMRU"
         statusItem = item
 
         if let button = item.button {
@@ -34,6 +34,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = PreviewWindowController.shared // create the panel on the main thread
         MRUTracker.shared.start()
         ThumbnailStore.shared.start()
+
+        // Retry until Accessibility is granted, so the app starts working
+        // without a relaunch (the event tap cannot be installed before that).
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+            guard ShortcutInterceptor.shared.isRunning else {
+                ShortcutInterceptor.shared.start()
+                return
+            }
+            timer.invalidate()
+            self?.permissionTimer = nil
+        }
     }
 
     @objc private func openSettings() {

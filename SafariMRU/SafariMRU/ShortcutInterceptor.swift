@@ -23,11 +23,21 @@ final class ShortcutInterceptor {
 
     private var eventTap: CFMachPort?
     private var isCycling = false
+    private var promptedForAccessibility = false
+
+    /// True once the event tap is installed and shortcuts are live.
+    private(set) var isRunning = false
 
     private let safariBundleID = "com.apple.Safari"
 
+    /// Install the event tap. Call again after granting Accessibility: it
+    /// returns early once running, and only prompts once.
     func start() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        guard !isRunning else { return }
+
+        let prompt = !promptedForAccessibility
+        promptedForAccessibility = true
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: prompt] as CFDictionary
         guard AXIsProcessTrustedWithOptions(options) else { return }
 
         let eventMask: CGEventMask =
@@ -47,6 +57,7 @@ final class ShortcutInterceptor {
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        isRunning = true
     }
 
     fileprivate func handleCGEvent(

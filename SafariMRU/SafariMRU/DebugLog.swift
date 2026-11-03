@@ -2,22 +2,27 @@
 //  DebugLog.swift
 //  SafariMRU
 //
-//  Minimal file logger for diagnosing the extension -> app pipeline.
+//  Minimal file logger for diagnosing AX / favicon issues. Debug builds only:
+//  release builds compile the body away so nothing is written to the user's
+//  home directory.
 //
 
 import Foundation
 
 final class DebugLog {
     static let shared = DebugLog()
-    private let url: URL
+
+    private let url = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("mru-debug.log")
     private let lock = NSLock()
 
     init() {
-        url = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("mru-debug.log")
+        #if DEBUG
         try? FileManager.default.removeItem(at: url)
+        #endif
     }
 
     func log(_ msg: String) {
+        #if DEBUG
         lock.lock()
         defer { lock.unlock() }
         let line = "\(Date()) \(msg)\n"
@@ -30,5 +35,6 @@ final class DebugLog {
                 try? data.write(to: url)
             }
         }
+        #endif
     }
 }

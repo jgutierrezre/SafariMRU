@@ -3,3 +3,5 @@
 *.xcuserstate
 build/
 DerivedData/
+dist/
+*.xcarchive

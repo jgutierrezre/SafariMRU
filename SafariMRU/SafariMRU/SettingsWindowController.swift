@@ -71,9 +71,19 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                LabeledContent("Version", value: Self.versionText)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: 300)
+        .frame(width: 440, height: 340)
+    }
+
+    private static var versionText: String {
+        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        return "\(short) (\(build))"
     }
 
     private func setLogin(_ on: Bool) {
@@ -96,7 +106,7 @@ struct SettingsView: View {
 final class SettingsWindowController: NSWindowController {
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 340),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false

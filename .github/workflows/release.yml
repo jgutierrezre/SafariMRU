@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build and release (e.g. v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: v
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Show toolchain
+        run: xcodebuild -version
+
+      - name: Build release zip
+        run: |
+          set -o pipefail
+          Scripts/build-release.sh "${{ steps.v.outputs.version }}" | tail -40
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SafariMRU-${{ steps.v.outputs.version }}
+          path: dist/*.zip
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.v.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.zip --clobber
+          else
+            gh release create "$TAG" dist/*.zip \
+              --title "Safari MRU ${TAG#v}" \
+              --notes-file .github/release-notes.md \
+              --verify-tag
+          fi
