@@ -9,7 +9,7 @@ A native, most-recently-used tab switcher for Safari.
    (or run `xattr -dr com.apple.quarantine /Applications/SafariMRU.app`).
 4. Launch it and grant **Accessibility** in **System Settings → Privacy & Security → Accessibility**.
    No relaunch needed — the app retries until the permission is in place.
-5. Optional: menu bar icon → **Settings…** → **Show tab thumbnails**, then allow **Screen Recording**.
+5. Optional: menu bar icon → **Settings…** → **Show tab thumbnails**, then allow **Screen & System Audio Recording**. If Safari MRU is not listed, click **+** and add the app.
 
 ### Shortcuts
 

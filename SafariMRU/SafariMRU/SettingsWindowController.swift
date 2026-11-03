@@ -60,7 +60,7 @@ struct SettingsView: View {
                         Settings.thumbnailsEnabled = newValue
                         if newValue {
                             if !CGPreflightScreenCaptureAccess() {
-                                CGRequestScreenCaptureAccess()
+                                ThumbnailStore.shared.requestScreenRecordingAccess()
                             }
                         } else {
                             ThumbnailStore.shared.clear()

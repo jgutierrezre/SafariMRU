@@ -32,7 +32,20 @@ final class ThumbnailStore: @unchecked Sendable {
         // Thumbnails are already enabled but the grant was lost (e.g. the app
         // was updated or the permission was removed). Ask again once per launch.
         if Settings.thumbnailsEnabled && !CGPreflightScreenCaptureAccess() {
-            CGRequestScreenCaptureAccess()
+            requestScreenRecordingAccess()
+        }
+    }
+
+    /// Ask for Screen Recording and make a real ScreenCaptureKit call. The
+    /// prompt alone does not always add the app to the privacy list — only an
+    /// actual capture attempt does.
+    func requestScreenRecordingAccess() {
+        // The system only adds an app to the Screen Recording list when it is
+        // active and actually attempts a capture.
+        NSApp.activate(ignoringOtherApps: true)
+        CGRequestScreenCaptureAccess()
+        Task.detached(priority: .utility) {
+            _ = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         }
     }
 

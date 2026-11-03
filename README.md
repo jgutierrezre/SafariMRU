@@ -30,7 +30,7 @@ Unlike browser extensions, Safari MRU is fully native: it reads Safari's real ta
      xattr -dr com.apple.quarantine /Applications/SafariMRU.app
      ```
 4. Launch the app. It asks for **Accessibility** access — approve it in **System Settings → Privacy & Security → Accessibility**. No relaunch is needed; the app retries every couple of seconds until the permission is granted.
-5. Optional: open **Settings…** from the menu-bar icon and enable **Show tab thumbnails**, then allow **Screen Recording** when prompted.
+5. Optional: open **Settings…** from the menu-bar icon and enable **Show tab thumbnails**, then allow **Screen & System Audio Recording** when prompted. If the app is not listed there, click **+** and add `/Applications/SafariMRU.app`.
 
 > The signing identity is stable, so **Accessibility and Screen Recording grants survive app updates**. They are only lost if you replace the app or remove the entry by hand.
 

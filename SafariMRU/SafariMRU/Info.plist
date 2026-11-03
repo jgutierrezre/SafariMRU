@@ -4,5 +4,7 @@
 <dict>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Safari MRU captures the visible Safari tab so the tab switcher can show thumbnails.</string>
 </dict>
 </plist>

@@ -51,15 +51,19 @@ jobs:
           security create-keychain -p actions "$KEYCHAIN"
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
           security unlock-keychain -p actions "$KEYCHAIN"
+          security default-keychain -s "$KEYCHAIN"
           security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
 
-          # A self-signed certificate must be trusted locally before codesign
-          # will accept it as an identity.
+          # A self-signed certificate must be trusted before codesign will
+          # accept it as an identity. Trust it in the admin domain (the runner
+          # has passwordless sudo); the user-domain store waits on a GUI
+          # authorization that never arrives on a headless runner.
           openssl pkcs12 -in "$RUNNER_TEMP/cert.p12" -clcerts -nokeys \
             -out "$RUNNER_TEMP/cert.pem" -passin "pass:$CERT_PASSWORD"
-          security add-trusted-cert -r trustRoot -k "$KEYCHAIN" "$RUNNER_TEMP/cert.pem"
-          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          sudo security add-trusted-cert -d -r trustRoot \
+            -k /Library/Keychains/System.keychain "$RUNNER_TEMP/cert.pem"
 
           rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/cert.pem"
           echo "SIGN_IDENTITY=SafariMRU Self-Signed" >> "$GITHUB_ENV"
