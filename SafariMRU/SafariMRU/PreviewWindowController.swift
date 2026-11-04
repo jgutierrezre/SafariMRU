@@ -34,22 +34,30 @@ struct PreviewLayout {
     }
 }
 
+/// Borderless window that can become key; a non-activating panel never owns the
+/// pointer, which leaves the previous app's hover and cursor in charge.
+private final class OverlayWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
 final class PreviewWindowController {
     static let shared = PreviewWindowController()
 
-    private let panel: NSPanel
+    private let panel: NSWindow
     private let previewView = PreviewView()
 
     var windowNumber: Int { panel.windowNumber }
     var isVisible: Bool { panel.isVisible }
 
     init() {
-        panel = NSPanel(
+        panel = OverlayWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 88),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
+        panel.acceptsMouseMovedEvents = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
@@ -83,15 +91,14 @@ final class PreviewWindowController {
         panel.setFrame(screenFrame, display: true)
 
         if !panel.isVisible {
-            // Become the active app while the switcher is open: the previous
-            // app drops its hover state, and the overlay owns the cursor.
+            // Take focus (no Dock icon; accessory app) so the overlay is the
+            // key window and therefore owns the pointer and the cursor.
             NSApp.activate(ignoringOtherApps: true)
-            panel.orderFront(nil)
+            panel.makeKeyAndOrderFront(nil)
             DispatchQueue.main.async { [weak self] in
                 guard let self = self, self.panel.isVisible,
                       let location = CGEvent(source: nil)?.location else { return }
                 self.pointerMoved(to: self.cocoaPoint(fromCG: location))
-                self.resetBackgroundHover()
             }
         }
     }
@@ -130,43 +137,6 @@ final class PreviewWindowController {
         }
     }
 
-
-    /// Safari's page hover is positional and survives deactivation, and it
-    /// ignores events posted straight to its process. The only reliable reset is
-    /// a real pointer move away from it, then an event-free warp back — with the
-    /// cursor hidden for the few milliseconds in between.
-    private func resetBackgroundHover() {
-        guard let original = CGEvent(source: nil)?.location else { return }
-        let display = CGMainDisplayID()
-        let bounds = CGDisplayBounds(display)
-
-        // Let the next move through for a moment so it reaches the window
-        // server, then restore the pointer without generating an event.
-        ShortcutInterceptor.shared.allowMouseMoves(for: 0.3)
-        CGDisplayHideCursor(display)
-        postMove(to: CGPoint(x: bounds.midX, y: bounds.minY + 4))
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            CGWarpMouseCursorPosition(original)
-            CGDisplayShowCursor(display)
-            guard let self = self, self.panel.isVisible else { return }
-            self.pointerMoved(to: self.cocoaPoint(fromCG: original))
-        }
-        // In case the synthetic move was processed late.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            CGWarpMouseCursorPosition(original)
-            guard let self = self, self.panel.isVisible else { return }
-            self.pointerMoved(to: self.cocoaPoint(fromCG: original))
-        }
-    }
-
-    /// A move posted at the HID level, so the window server re-targets the
-    /// window under the pointer.
-    private func postMove(to point: CGPoint) {
-        guard let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
-                                  mouseCursorPosition: point, mouseButton: .left) else { return }
-        event.post(tap: .cghidEventTap)
-    }
 
     private func cocoaPoint(fromCG location: CGPoint) -> NSPoint {
         let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.screens.first

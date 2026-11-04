@@ -21,26 +21,11 @@ private let numberKeys: [CGKeyCode: Int] = [
 final class ShortcutInterceptor {
     static let shared = ShortcutInterceptor()
 
-    /// Marks the one synthetic move posted when the overlay opens, so it can
-    /// pass through (clearing the previous app's hover) while real moves are
-    /// swallowed.
-    static let overlayNudgeMarker: Int64 = 0x534D5255
 
-    /// Temporarily let pointer moves reach the window server. Used for the
-    /// single move that resets the previous app's hover state.
-    func allowMouseMoves(for duration: TimeInterval) {
-        mousePassUntil = Date().addingTimeInterval(duration)
-    }
-
-    var isMousePassThroughActive: Bool {
-        guard let until = mousePassUntil else { return false }
-        return Date() < until
-    }
 
     private var eventTap: CFMachPort?
     private var isCycling = false
     private var swallowingClick = false
-    private var mousePassUntil: Date?
     private var promptedForAccessibility = false
 
     /// True once the event tap is installed and shortcuts are live.
@@ -113,7 +98,7 @@ final class ShortcutInterceptor {
         if type == .mouseMoved || type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged {
             if PreviewWindowController.shared.isVisible {
                 PreviewWindowController.shared.pointerMoved(to: cocoaPoint(for: event.location))
-                return isMousePassThroughActive ? Unmanaged.passUnretained(event) : nil
+                return nil
             }
             return Unmanaged.passUnretained(event)
         }
