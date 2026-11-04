@@ -52,13 +52,18 @@ final class PreviewWindowController {
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.level = .floating
+        panel.hasShadow = false
+        // Above the menu bar so the whole screen is covered and no pointer
+        // event reaches the app underneath while the switcher is open.
+        panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = previewView
 
         previewView.onCardClicked = { index in
             MRUSwitcher.shared.commitToIndex(index)
+        }
+        previewView.onOutsideClick = {
+            MRUSwitcher.shared.cancel()
         }
     }
 
@@ -71,13 +76,11 @@ final class PreviewWindowController {
         previewView.selectedIndex = selected
         previewView.needsDisplay = true
 
-        let width = layout.width(for: tabs.count)
-        let height = layout.height(for: tabs.count)
-        panel.setContentSize(NSSize(width: width, height: height))
-
-        let frame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
+        // Cover the entire screen: the overlay owns the pointer while visible,
+        // so hovering/clicking cannot interact with the app behind it.
+        let screenFrame = (NSScreen.main ?? NSScreen.screens.first)?.frame
             ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        panel.setFrameOrigin(NSPoint(x: frame.midX - width / 2, y: frame.midY - height / 2))
+        panel.setFrame(screenFrame, display: true)
 
         if !panel.isVisible {
             panel.orderFront(nil)
@@ -135,6 +138,7 @@ final class PreviewView: NSView {
     var selectedIndex = 0
 
     var onCardClicked: ((Int) -> Void)?
+    var onOutsideClick: (() -> Void)?
 
     private var favicons: [String: NSImage] = [:]
     private var cardRects: [(index: Int, rect: NSRect)] = []
@@ -181,6 +185,8 @@ final class PreviewView: NSView {
             onCardClicked?(index)
             return
         }
+        // Click on the backdrop: dismiss the switcher.
+        onOutsideClick?()
     }
 
     override func draw(_ dirtyRect: NSRect) {

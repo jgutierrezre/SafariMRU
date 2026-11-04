@@ -77,15 +77,17 @@ final class ShortcutInterceptor {
             return Unmanaged.passUnretained(event)
         }
 
-        // A click anywhere outside the preview panel dismisses the switcher.
-        // Handled before the Safari check: the click may land on any app. The
-        // click is swallowed (down and up) so it does not also hit that app.
+        // Clicks while the preview is open belong to the switcher. Clicks on
+        // the (full-screen) overlay are delivered to it; clicks on another
+        // display dismiss the switcher. Either way the matching mouse-up is
+        // swallowed so it cannot interact with the app underneath.
         if type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown {
-            if PreviewWindowController.shared.isVisible,
-               !PreviewWindowController.shared.containsMouseLocation() {
-                MRUSwitcher.shared.cancel()
+            if PreviewWindowController.shared.isVisible {
                 swallowingClick = true
-                return nil
+                if !PreviewWindowController.shared.containsMouseLocation() {
+                    MRUSwitcher.shared.cancel()
+                    return nil
+                }
             }
             return Unmanaged.passUnretained(event)
         }
