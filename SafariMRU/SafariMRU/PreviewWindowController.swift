@@ -88,13 +88,39 @@ final class PreviewWindowController {
     }
 
     func hide() {
+        previewView.updateHover(at: nil)
+        NSCursor.arrow.set()
         panel.orderOut(nil)
     }
 
-    /// True when the pointer is over the preview panel (used to tell an
-    /// outside click from a click on a card).
-    func containsMouseLocation() -> Bool {
-        panel.frame.contains(NSEvent.mouseLocation)
+    /// Pointer tracking is driven by the event tap, so the background app
+    /// never sees mouse moves while the overlay is open.
+    func pointerMoved(to screenPoint: NSPoint) {
+        guard panel.isVisible else { return }
+        let point = viewPoint(for: screenPoint)
+        previewView.updateHover(at: point)
+        if previewView.cardIndex(at: point) != nil {
+            NSCursor.pointingHand.set()
+        } else {
+            NSCursor.arrow.set()
+        }
+    }
+
+    /// A click while the overlay is open: a card switches to that tab,
+    /// anywhere else dismisses the switcher. The tap swallows the event.
+    func click(at screenPoint: NSPoint) {
+        guard panel.isVisible else { return }
+        let point = viewPoint(for: screenPoint)
+        if let index = previewView.cardIndex(at: point) {
+            MRUSwitcher.shared.commitToIndex(index)
+        } else {
+            MRUSwitcher.shared.cancel()
+        }
+    }
+
+    private func viewPoint(for screenPoint: NSPoint) -> NSPoint {
+        let windowPoint = panel.convertPoint(fromScreen: screenPoint)
+        return previewView.convert(windowPoint, from: nil)
     }
 
     func refresh() {
@@ -159,15 +185,25 @@ final class PreviewView: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        let idx = cardRects.first(where: { $0.rect.contains(point) })?.index
-        if idx != hoveredIndex {
-            hoveredIndex = idx
-            needsDisplay = true
-        }
-        if idx != nil {
+        updateHover(at: point)
+        if hoveredIndex != nil {
             NSCursor.pointingHand.set()
         } else {
             NSCursor.arrow.set()
+        }
+    }
+
+    /// Index of the card under `point` (view coordinates), if any.
+    func cardIndex(at point: NSPoint) -> Int? {
+        cardRects.first(where: { $0.rect.contains(point) })?.index
+    }
+
+    /// Update the hover highlight for a point in view coordinates.
+    func updateHover(at point: NSPoint?) {
+        let idx = point.flatMap { cardIndex(at: $0) }
+        if idx != hoveredIndex {
+            hoveredIndex = idx
+            needsDisplay = true
         }
     }
 

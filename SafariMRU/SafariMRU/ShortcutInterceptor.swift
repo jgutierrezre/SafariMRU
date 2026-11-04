@@ -49,7 +49,12 @@ final class ShortcutInterceptor {
             (1 << CGEventType.otherMouseDown.rawValue) |
             (1 << CGEventType.leftMouseUp.rawValue) |
             (1 << CGEventType.rightMouseUp.rawValue) |
-            (1 << CGEventType.otherMouseUp.rawValue)
+            (1 << CGEventType.otherMouseUp.rawValue) |
+            (1 << CGEventType.mouseMoved.rawValue) |
+            (1 << CGEventType.leftMouseDragged.rawValue) |
+            (1 << CGEventType.rightMouseDragged.rawValue) |
+            (1 << CGEventType.otherMouseDragged.rawValue) |
+            (1 << CGEventType.scrollWheel.rawValue)
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -77,17 +82,28 @@ final class ShortcutInterceptor {
             return Unmanaged.passUnretained(event)
         }
 
-        // Clicks while the preview is open belong to the switcher. Clicks on
-        // the (full-screen) overlay are delivered to it; clicks on another
-        // display dismiss the switcher. Either way the matching mouse-up is
-        // swallowed so it cannot interact with the app underneath.
+        // While the preview is open the switcher owns the pointer: moves,
+        // drags and scrolling are swallowed so the app underneath never sees
+        // them, and hovering is driven from here.
+        if type == .mouseMoved || type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged {
+            if PreviewWindowController.shared.isVisible {
+                PreviewWindowController.shared.pointerMoved(to: NSEvent.mouseLocation)
+                return nil
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
+        if type == .scrollWheel {
+            return PreviewWindowController.shared.isVisible ? nil : Unmanaged.passUnretained(event)
+        }
+
+        // Clicks belong to the switcher too: a card switches, the backdrop
+        // dismisses. Both down and up are swallowed.
         if type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown {
             if PreviewWindowController.shared.isVisible {
                 swallowingClick = true
-                if !PreviewWindowController.shared.containsMouseLocation() {
-                    MRUSwitcher.shared.cancel()
-                    return nil
-                }
+                PreviewWindowController.shared.click(at: NSEvent.mouseLocation)
+                return nil
             }
             return Unmanaged.passUnretained(event)
         }
