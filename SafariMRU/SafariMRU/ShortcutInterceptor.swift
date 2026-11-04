@@ -91,13 +91,12 @@ final class ShortcutInterceptor {
             return Unmanaged.passUnretained(event)
         }
 
-        // While the preview is open the switcher owns the pointer: moves,
-        // drags and scrolling are swallowed so the app underneath never sees
-        // them, and hovering is driven from here.
+        // Moves are passed through: the full-screen overlay is the window under
+        // the pointer, so it receives them (driving hover/cursor) and the app
+        // underneath gets the mouse-exited that clears its own hover state.
         if type == .mouseMoved || type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged {
             if PreviewWindowController.shared.isVisible {
                 PreviewWindowController.shared.pointerMoved(to: cocoaPoint(for: event.location))
-                return nil
             }
             return Unmanaged.passUnretained(event)
         }

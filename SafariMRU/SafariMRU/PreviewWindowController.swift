@@ -84,6 +84,18 @@ final class PreviewWindowController {
 
         if !panel.isVisible {
             panel.orderFront(nil)
+            // The pointer may be resting on an interactive element. Nudge one
+            // mouse-move so the app underneath gets its mouse-exited and the
+            // cursor is recomputed for the overlay.
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, self.panel.isVisible else { return }
+                self.pointerMoved(to: NSEvent.mouseLocation)
+                if let location = CGEvent(source: nil)?.location {
+                    CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+                            mouseCursorPosition: location, mouseButton: .left)?
+                        .post(tap: .cghidEventTap)
+                }
+            }
         }
     }
 
@@ -174,6 +186,16 @@ final class PreviewView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// Cursor rects work for an inactive window, so they back up the manual
+    /// cursor updates while the switcher owns the pointer.
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .arrow)
+        for entry in cardRects {
+            addCursorRect(entry.rect, cursor: .pointingHand)
+        }
+    }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func updateTrackingAreas() {
@@ -250,6 +272,8 @@ final class PreviewView: NSView {
             cardRects.append((index: i, rect: rect))
             drawCard(tab, index: i, in: rect)
         }
+
+        window?.invalidateCursorRects(for: self)
     }
 
     private func drawCard(_ tab: TabPreview, index: Int, in rect: NSRect) {
