@@ -91,6 +91,7 @@ final class PreviewWindowController {
                 guard let self = self, self.panel.isVisible,
                       let location = CGEvent(source: nil)?.location else { return }
                 self.pointerMoved(to: self.cocoaPoint(fromCG: location))
+                self.clearSafariHover()
             }
         }
     }
@@ -129,6 +130,20 @@ final class PreviewWindowController {
         }
     }
 
+
+    /// Safari keeps the page's hover state even when it is inactive. Posting a
+    /// move into its toolbar (delivered to Safari only, so the real cursor does
+    /// not move) makes WebKit clear it.
+    private func clearSafariHover() {
+        guard let safari = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Safari").first,
+              let web = SafariAX.webContentFrame() else { return }
+        let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.screens.first
+        let screenHeight = primary?.frame.maxY ?? 0
+        let point = CGPoint(x: web.midX, y: screenHeight - (web.maxY + 6))
+        CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+                mouseCursorPosition: point, mouseButton: .left)?
+            .postToPid(safari.processIdentifier)
+    }
 
     private func cocoaPoint(fromCG location: CGPoint) -> NSPoint {
         let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.screens.first
