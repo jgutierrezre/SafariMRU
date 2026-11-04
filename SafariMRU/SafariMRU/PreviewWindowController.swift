@@ -88,6 +88,12 @@ final class PreviewWindowController {
         panel.orderOut(nil)
     }
 
+    /// True when the pointer is over the preview panel (used to tell an
+    /// outside click from a click on a card).
+    func containsMouseLocation() -> Bool {
+        panel.frame.contains(NSEvent.mouseLocation)
+    }
+
     func refresh() {
         guard panel.isVisible else { return }
         previewView.needsDisplay = true

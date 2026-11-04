@@ -42,7 +42,10 @@ final class ShortcutInterceptor {
 
         let eventMask: CGEventMask =
             (1 << CGEventType.keyDown.rawValue) |
-            (1 << CGEventType.flagsChanged.rawValue)
+            (1 << CGEventType.flagsChanged.rawValue) |
+            (1 << CGEventType.leftMouseDown.rawValue) |
+            (1 << CGEventType.rightMouseDown.rawValue) |
+            (1 << CGEventType.otherMouseDown.rawValue)
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -67,6 +70,16 @@ final class ShortcutInterceptor {
     ) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
+            return Unmanaged.passUnretained(event)
+        }
+
+        // A click anywhere outside the preview panel dismisses the switcher.
+        // Handled before the Safari check: the click may land on any app.
+        if type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown {
+            if PreviewWindowController.shared.isVisible,
+               !PreviewWindowController.shared.containsMouseLocation() {
+                MRUSwitcher.shared.cancel()
+            }
             return Unmanaged.passUnretained(event)
         }
 
