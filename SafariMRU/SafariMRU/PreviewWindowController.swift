@@ -91,12 +91,13 @@ final class PreviewWindowController {
                 guard let self = self, self.panel.isVisible else { return }
                 guard let location = CGEvent(source: nil)?.location else { return }
                 self.pointerMoved(to: self.cocoaPoint(fromCG: location))
-                // One synthetic move the tap lets through: it clears the
-                // previous app's hover and applies our cursor rects.
-                if let nudge = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
-                                       mouseCursorPosition: location, mouseButton: .left) {
-                    nudge.setIntegerValueField(.eventSourceUserData, value: ShortcutInterceptor.overlayNudgeMarker)
-                    nudge.post(tap: .cghidEventTap)
+                // A real (1 px) move is required: macOS only re-evaluates the
+                // window under the cursor when the pointer moves, which is what
+                // clears the previous app's hover and applies our cursor rects.
+                self.postNudge(at: CGPoint(x: location.x + 1, y: location.y))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
+                    guard let self = self, self.panel.isVisible else { return }
+                    self.postNudge(at: location)
                 }
             }
         }
@@ -133,6 +134,15 @@ final class PreviewWindowController {
         }
     }
 
+
+    /// A synthetic move the tap lets through (marked) so the window server
+    /// recomputes the window under the pointer.
+    private func postNudge(at point: CGPoint) {
+        guard let nudge = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+                                  mouseCursorPosition: point, mouseButton: .left) else { return }
+        nudge.setIntegerValueField(.eventSourceUserData, value: ShortcutInterceptor.overlayNudgeMarker)
+        nudge.post(tap: .cghidEventTap)
+    }
 
     private func cocoaPoint(fromCG location: CGPoint) -> NSPoint {
         let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.screens.first
