@@ -83,22 +83,14 @@ final class PreviewWindowController {
         panel.setFrame(screenFrame, display: true)
 
         if !panel.isVisible {
+            // Become the active app while the switcher is open: the previous
+            // app drops its hover state, and the overlay owns the cursor.
+            NSApp.activate(ignoringOtherApps: true)
             panel.orderFront(nil)
-            // The pointer may be resting on an interactive element. Nudge one
-            // mouse-move so the app underneath gets its mouse-exited and the
-            // cursor is recomputed for the overlay.
             DispatchQueue.main.async { [weak self] in
-                guard let self = self, self.panel.isVisible else { return }
-                guard let location = CGEvent(source: nil)?.location else { return }
+                guard let self = self, self.panel.isVisible,
+                      let location = CGEvent(source: nil)?.location else { return }
                 self.pointerMoved(to: self.cocoaPoint(fromCG: location))
-                // A real (1 px) move is required: macOS only re-evaluates the
-                // window under the cursor when the pointer moves, which is what
-                // clears the previous app's hover and applies our cursor rects.
-                self.postNudge(at: CGPoint(x: location.x + 1, y: location.y))
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
-                    guard let self = self, self.panel.isVisible else { return }
-                    self.postNudge(at: location)
-                }
             }
         }
     }
@@ -107,6 +99,9 @@ final class PreviewWindowController {
         previewView.updateHover(at: nil)
         NSCursor.arrow.set()
         panel.orderOut(nil)
+        // Hand focus back to Safari; the switcher is only ever opened from it.
+        NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Safari").first?
+            .activate(options: [.activateIgnoringOtherApps])
     }
 
     /// Pointer tracking is driven by the event tap, so the background app
@@ -134,15 +129,6 @@ final class PreviewWindowController {
         }
     }
 
-
-    /// A synthetic move the tap lets through (marked) so the window server
-    /// recomputes the window under the pointer.
-    private func postNudge(at point: CGPoint) {
-        guard let nudge = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
-                                  mouseCursorPosition: point, mouseButton: .left) else { return }
-        nudge.setIntegerValueField(.eventSourceUserData, value: ShortcutInterceptor.overlayNudgeMarker)
-        nudge.post(tap: .cghidEventTap)
-    }
 
     private func cocoaPoint(fromCG location: CGPoint) -> NSPoint {
         let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.screens.first

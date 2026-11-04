@@ -130,7 +130,9 @@ final class ShortcutInterceptor {
             return Unmanaged.passUnretained(event)
         }
 
-        guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == safariBundleID else {
+        // While the switcher is open this app is intentionally the active one.
+        let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        guard frontmost == safariBundleID || PreviewWindowController.shared.isVisible else {
             if isCycling {
                 isCycling = false
                 MRUSwitcher.shared.commit()
