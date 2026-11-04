@@ -72,6 +72,15 @@ final class ShortcutInterceptor {
         isRunning = true
     }
 
+    /// CGEvent locations use a top-left origin; AppKit screen coordinates use
+    /// the bottom-left of the main display. (NSEvent.mouseLocation is stale here
+    /// because the moves are swallowed before AppKit processes them.)
+    private func cocoaPoint(for location: CGPoint) -> NSPoint {
+        let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.screens.first
+        let height = primary?.frame.maxY ?? 0
+        return NSPoint(x: location.x, y: height - location.y)
+    }
+
     fileprivate func handleCGEvent(
         proxy: CGEventTapProxy,
         type: CGEventType,
@@ -87,7 +96,7 @@ final class ShortcutInterceptor {
         // them, and hovering is driven from here.
         if type == .mouseMoved || type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged {
             if PreviewWindowController.shared.isVisible {
-                PreviewWindowController.shared.pointerMoved(to: NSEvent.mouseLocation)
+                PreviewWindowController.shared.pointerMoved(to: cocoaPoint(for: event.location))
                 return nil
             }
             return Unmanaged.passUnretained(event)
@@ -102,7 +111,7 @@ final class ShortcutInterceptor {
         if type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown {
             if PreviewWindowController.shared.isVisible {
                 swallowingClick = true
-                PreviewWindowController.shared.click(at: NSEvent.mouseLocation)
+                PreviewWindowController.shared.click(at: cocoaPoint(for: event.location))
                 return nil
             }
             return Unmanaged.passUnretained(event)

@@ -118,6 +118,7 @@ final class PreviewWindowController {
         }
     }
 
+
     private func viewPoint(for screenPoint: NSPoint) -> NSPoint {
         let windowPoint = panel.convertPoint(fromScreen: screenPoint)
         return previewView.convert(windowPoint, from: nil)
