@@ -23,6 +23,7 @@ final class ShortcutInterceptor {
 
     private var eventTap: CFMachPort?
     private var isCycling = false
+    private var swallowingClick = false
     private var promptedForAccessibility = false
 
     /// True once the event tap is installed and shortcuts are live.
@@ -45,7 +46,10 @@ final class ShortcutInterceptor {
             (1 << CGEventType.flagsChanged.rawValue) |
             (1 << CGEventType.leftMouseDown.rawValue) |
             (1 << CGEventType.rightMouseDown.rawValue) |
-            (1 << CGEventType.otherMouseDown.rawValue)
+            (1 << CGEventType.otherMouseDown.rawValue) |
+            (1 << CGEventType.leftMouseUp.rawValue) |
+            (1 << CGEventType.rightMouseUp.rawValue) |
+            (1 << CGEventType.otherMouseUp.rawValue)
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -74,11 +78,22 @@ final class ShortcutInterceptor {
         }
 
         // A click anywhere outside the preview panel dismisses the switcher.
-        // Handled before the Safari check: the click may land on any app.
+        // Handled before the Safari check: the click may land on any app. The
+        // click is swallowed (down and up) so it does not also hit that app.
         if type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown {
             if PreviewWindowController.shared.isVisible,
                !PreviewWindowController.shared.containsMouseLocation() {
                 MRUSwitcher.shared.cancel()
+                swallowingClick = true
+                return nil
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
+        if type == .leftMouseUp || type == .rightMouseUp || type == .otherMouseUp {
+            if swallowingClick {
+                swallowingClick = false
+                return nil
             }
             return Unmanaged.passUnretained(event)
         }
@@ -114,6 +129,7 @@ final class ShortcutInterceptor {
 
             if keyCode == kVK_Tab && isCtrl && !isCmdOrOpt {
                 isCycling = true
+                swallowingClick = false
                 if flags.contains(.maskShift) {
                     MRUSwitcher.shared.cycleBackward()
                 } else {
