@@ -17,6 +17,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        // A stable autosave name lets the system persist the item's position and
+        // lets menu-bar managers (Thaw, Ice, Bartender) keep tracking it.
+        item.autosaveName = "SafariMRU"
         statusItem = item
 
         if let button = item.button {
