@@ -89,11 +89,14 @@ final class PreviewWindowController {
             // cursor is recomputed for the overlay.
             DispatchQueue.main.async { [weak self] in
                 guard let self = self, self.panel.isVisible else { return }
-                self.pointerMoved(to: NSEvent.mouseLocation)
-                if let location = CGEvent(source: nil)?.location {
-                    CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
-                            mouseCursorPosition: location, mouseButton: .left)?
-                        .post(tap: .cghidEventTap)
+                guard let location = CGEvent(source: nil)?.location else { return }
+                self.pointerMoved(to: self.cocoaPoint(fromCG: location))
+                // One synthetic move the tap lets through: it clears the
+                // previous app's hover and applies our cursor rects.
+                if let nudge = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+                                       mouseCursorPosition: location, mouseButton: .left) {
+                    nudge.setIntegerValueField(.eventSourceUserData, value: ShortcutInterceptor.overlayNudgeMarker)
+                    nudge.post(tap: .cghidEventTap)
                 }
             }
         }
@@ -130,6 +133,11 @@ final class PreviewWindowController {
         }
     }
 
+
+    private func cocoaPoint(fromCG location: CGPoint) -> NSPoint {
+        let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.screens.first
+        return NSPoint(x: location.x, y: (primary?.frame.maxY ?? 0) - location.y)
+    }
 
     private func viewPoint(for screenPoint: NSPoint) -> NSPoint {
         let windowPoint = panel.convertPoint(fromScreen: screenPoint)

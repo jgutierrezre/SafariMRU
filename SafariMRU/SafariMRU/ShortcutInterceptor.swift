@@ -21,6 +21,11 @@ private let numberKeys: [CGKeyCode: Int] = [
 final class ShortcutInterceptor {
     static let shared = ShortcutInterceptor()
 
+    /// Marks the one synthetic move posted when the overlay opens, so it can
+    /// pass through (clearing the previous app's hover) while real moves are
+    /// swallowed.
+    static let overlayNudgeMarker: Int64 = 0x534D5255
+
     private var eventTap: CFMachPort?
     private var isCycling = false
     private var swallowingClick = false
@@ -91,12 +96,13 @@ final class ShortcutInterceptor {
             return Unmanaged.passUnretained(event)
         }
 
-        // Moves are passed through: the full-screen overlay is the window under
-        // the pointer, so it receives them (driving hover/cursor) and the app
-        // underneath gets the mouse-exited that clears its own hover state.
+        // The overlay owns the pointer: real moves/drags are swallowed so the
+        // app underneath cannot react. Hover and the cursor are driven here.
         if type == .mouseMoved || type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged {
             if PreviewWindowController.shared.isVisible {
                 PreviewWindowController.shared.pointerMoved(to: cocoaPoint(for: event.location))
+                let isNudge = event.getIntegerValueField(.eventSourceUserData) == Self.overlayNudgeMarker
+                return isNudge ? Unmanaged.passUnretained(event) : nil
             }
             return Unmanaged.passUnretained(event)
         }
