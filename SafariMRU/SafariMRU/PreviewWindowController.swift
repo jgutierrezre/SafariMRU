@@ -91,7 +91,7 @@ final class PreviewWindowController {
                 guard let self = self, self.panel.isVisible,
                       let location = CGEvent(source: nil)?.location else { return }
                 self.pointerMoved(to: self.cocoaPoint(fromCG: location))
-                self.clearSafariHover()
+                self.resetBackgroundHover()
             }
         }
     }
@@ -131,18 +131,31 @@ final class PreviewWindowController {
     }
 
 
-    /// Safari keeps the page's hover state even when it is inactive. Posting a
-    /// move into its toolbar (delivered to Safari only, so the real cursor does
-    /// not move) makes WebKit clear it.
-    private func clearSafariHover() {
-        guard let safari = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Safari").first,
-              let web = SafariAX.webContentFrame() else { return }
-        let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.screens.first
-        let screenHeight = primary?.frame.maxY ?? 0
-        let point = CGPoint(x: web.midX, y: screenHeight - (web.maxY + 6))
-        CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
-                mouseCursorPosition: point, mouseButton: .left)?
-            .postToPid(safari.processIdentifier)
+    /// Safari's page hover is positional and survives deactivation, and it
+    /// ignores events posted straight to its process. The only reliable reset is
+    /// a real pointer move away from it, then an event-free warp back — with the
+    /// cursor hidden for the few milliseconds in between.
+    private func resetBackgroundHover() {
+        guard let original = CGEvent(source: nil)?.location else { return }
+        let display = CGMainDisplayID()
+        let bounds = CGDisplayBounds(display)
+        CGDisplayHideCursor(display)
+        // An empty stretch of the menu bar: outside Safari, nothing to hover.
+        postMarkedMove(to: CGPoint(x: bounds.midX, y: bounds.minY + 4))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            CGWarpMouseCursorPosition(original)
+            CGDisplayShowCursor(display)
+            guard let self = self, self.panel.isVisible else { return }
+            self.pointerMoved(to: self.cocoaPoint(fromCG: original))
+        }
+    }
+
+    /// A move the tap lets through so it reaches the window under the pointer.
+    private func postMarkedMove(to point: CGPoint) {
+        guard let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+                                  mouseCursorPosition: point, mouseButton: .left) else { return }
+        event.setIntegerValueField(.eventSourceUserData, value: ShortcutInterceptor.overlayNudgeMarker)
+        event.post(tap: .cghidEventTap)
     }
 
     private func cocoaPoint(fromCG location: CGPoint) -> NSPoint {
