@@ -139,22 +139,32 @@ final class PreviewWindowController {
         guard let original = CGEvent(source: nil)?.location else { return }
         let display = CGMainDisplayID()
         let bounds = CGDisplayBounds(display)
+
+        // Let the next move through for a moment so it reaches the window
+        // server, then restore the pointer without generating an event.
+        ShortcutInterceptor.shared.allowMouseMoves(for: 0.3)
         CGDisplayHideCursor(display)
-        // An empty stretch of the menu bar: outside Safari, nothing to hover.
-        postMarkedMove(to: CGPoint(x: bounds.midX, y: bounds.minY + 4))
+        postMove(to: CGPoint(x: bounds.midX, y: bounds.minY + 4))
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             CGWarpMouseCursorPosition(original)
             CGDisplayShowCursor(display)
             guard let self = self, self.panel.isVisible else { return }
             self.pointerMoved(to: self.cocoaPoint(fromCG: original))
         }
+        // In case the synthetic move was processed late.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            CGWarpMouseCursorPosition(original)
+            guard let self = self, self.panel.isVisible else { return }
+            self.pointerMoved(to: self.cocoaPoint(fromCG: original))
+        }
     }
 
-    /// A move the tap lets through so it reaches the window under the pointer.
-    private func postMarkedMove(to point: CGPoint) {
+    /// A move posted at the HID level, so the window server re-targets the
+    /// window under the pointer.
+    private func postMove(to point: CGPoint) {
         guard let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
                                   mouseCursorPosition: point, mouseButton: .left) else { return }
-        event.setIntegerValueField(.eventSourceUserData, value: ShortcutInterceptor.overlayNudgeMarker)
         event.post(tap: .cghidEventTap)
     }
 
